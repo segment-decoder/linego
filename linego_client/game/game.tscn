@@ -1,0 +1,29 @@
+[gd_scene load_steps=2 format=3 uid="uid://c5enqy1t4nrpb"]
+
+[sub_resource type="GDScript" id="GDScript_mwb40"]
+script/source = "extends Node2D
+
+var	board_size_x = 3
+var	board_size_y = 3
+
+var	board = []
+
+func	_ready():
+	init_board()
+	print_board()
+
+func	init_board():
+	board.clear()
+	for y in range(board_size_y):
+		var	row = []
+		for x in range(board_size_x):
+			row.append(0)
+		board.append(row)
+
+func	print_board():
+	for row in board:
+		print(row)
+"
+
+[node name="Node2D" type="Node2D"]
+script = SubResource("GDScript_mwb40")

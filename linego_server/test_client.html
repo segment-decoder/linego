@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<meta charset="utf-8" />
+<title>WS Phone Test</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 20px; line-height: 1.5; }
+  input, button { font-size: 16px; }
+  #log { white-space: pre-wrap; background: #f6f6f6; padding: 12px; border-radius: 8px; }
+</style>
+
+<h1>WebSocket 휴대폰 테스트</h1>
+
+<label>
+  서버 주소:
+  <input id="url" size="35" value="ws://192.168.200.109:8080" />
+</label>
+<button id="connect">연결</button>
+
+<p id="status">상태: 대기 중</p>
+
+<div>
+  <input id="msg" placeholder="메시지 입력" />
+  <button id="send" disabled>전송</button>
+</div>
+
+<h3>로그</h3>
+<div id="log"></div>
+
+<script>
+let ws;
+const urlInput = document.getElementById("url");
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
+const sendBtn = document.getElementById("send");
+const msgInput = document.getElementById("msg");
+
+function log(s) { logEl.textContent += s + "\n"; }
+
+document.getElementById("connect").onclick = () => {
+  const url = urlInput.value.trim();
+  logEl.textContent = "";
+  statusEl.textContent = "상태: 연결 중...";
+  ws = new WebSocket(url);
+
+  ws.onopen = () => { statusEl.textContent = "상태: 연결됨"; sendBtn.disabled = false; log("연결 성공"); };
+  ws.onmessage = (e) => { log("서버→폰: " + e.data); };
+  ws.onclose = () => { statusEl.textContent = "상태: 연결 종료"; sendBtn.disabled = true; log("연결 종료"); };
+  ws.onerror = () => { statusEl.textContent = "상태: 에러"; log("에러 발생 (주소/방화벽 확인)"); };
+};
+
+sendBtn.onclick = () => {
+  const m = msgInput.value || "Hello from phone!";
+  ws?.send(m);
+  log("폰→서버: " + m);
+  msgInput.value = "";
+};
+</script>
+</html>

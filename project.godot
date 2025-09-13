@@ -1,0 +1,42 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="linego"
+run/main_scene="uid://dufvw0a70mmnd"
+config/features=PackedStringArray("4.4", "Mobile")
+config/icon="res://linego_client/icon.svg"
+
+[display]
+
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/stretch/mode="canvas_items"
+
+[input]
+
+touch_action={
+"deadzone": 0.2,
+"events": []
+}
+place_stone={
+"deadzone": 0.2,
+"events": []
+}
+add_line={
+"deadzone": 0.2,
+"events": []
+}
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

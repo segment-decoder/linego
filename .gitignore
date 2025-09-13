@@ -1,0 +1,21 @@
+# ### Node.js Server ###
+linego_server/node_modules/
+linego_server/*.log
+linego_server/npm-debug.log*
+linego_server/yarn-debug.log*
+linego_server/yarn-error.log*
+
+# ### Godot Client ###
+# .godot 폴더 (project.godot 파일과 같은 위치에 생성됨)
+.godot/
+
+# 아래 파일들은 linego_client 폴더 내부에 생성될 수 있습니다.
+linego_client/.mono/
+linego_client/export_presets.cfg
+linego_client/.editor/
+
+# ### OS / IDE ###
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
