@@ -30,8 +30,11 @@ func test_invalid_actions_are_rejected() -> void:
 	t.check_eq(game.validate(GameState.place_action(4, 0)), "out_of_board")
 	t.check_eq(game.validate(GameState.line_action(GameState.AXIS_COL, 5)), "bad_index")
 	t.check_eq(game.validate(GameState.line_action(GameState.AXIS_ROW, -1)), "bad_index")
-	t.check_eq(game.validate(GameState.line_action("diag", 0)), "bad_axis")
-	t.check_eq(game.validate({"type": "pass"}), "bad_type")
+	t.check_eq(game.validate(GameState.line_action("diag", 0)), "bad_action")
+	t.check_eq(game.validate({"type": "pass"}), "bad_action")
+	t.check_eq(game.validate({"type": "place", "x": "1", "y": 2}), "bad_action", "문자열 좌표")
+	t.check_eq(game.validate({"type": "place", "x": null}), "bad_action")
+	t.check_eq(game.validate("place"), "bad_action")
 	t.check(not game.apply(GameState.place_action(1, 1)))
 	t.check_eq(game.current_player, Stone.WHITE, "실패한 행동은 턴을 넘기지 않는다")
 
@@ -103,3 +106,48 @@ func test_state_survives_json() -> void:
 	var data: Dictionary = JSON.parse_string(JSON.stringify(game.to_dict()))
 	t.check_eq(BoardState.from_dict(data.board).to_text(), game.board.to_text())
 	t.check_eq(int(data.current_player), Stone.BLACK)
+
+
+func test_json_numbers_are_accepted() -> void:
+	# 네트워크로 오면 숫자가 float이 된다.
+	var game := GameState.new()
+	t.check(game.apply({"type": "place", "x": 1.0, "y": 2.0, "extra": true}))
+	t.check_eq(game.history[0], GameState.place_action(1, 2), "정규화되어 저장된다")
+
+
+func test_draw_at_turn_limit() -> void:
+	var game := GameState.new()
+	game.max_turns = 3
+	game.apply(GameState.place_action(0, 0))
+	game.apply(GameState.place_action(1, 0))
+	t.check(not game.is_over())
+	t.check_eq(game.turns_left(), 1)
+	game.apply(GameState.line_action(GameState.AXIS_ROW, 0))
+	t.check(game.draw, "제한 수에 도달하면 무승부")
+	t.check(game.is_over())
+	t.check_eq(game.winner, Stone.EMPTY)
+	t.check_eq(game.validate(GameState.place_action(2, 2)), "game_over")
+
+
+func test_win_on_last_turn_beats_draw() -> void:
+	var game := _game_with("XXXX.\n.....")
+	game.max_turns = 1
+	game.apply(GameState.place_action(4, 0))
+	t.check_eq(game.winner, Stone.BLACK)
+	t.check(not game.draw)
+
+
+func test_default_turn_limit_is_450() -> void:
+	t.check_eq(GameState.new().max_turns, 450)
+
+
+func test_from_dict_restores_everything() -> void:
+	var game := _game_with("XXXX..\n......")
+	game.apply(GameState.place_action(4, 0))
+	var copy := GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict())))
+	t.check_eq(copy.board.to_text(), game.board.to_text())
+	t.check_eq(copy.winner, Stone.BLACK)
+	t.check_eq(copy.winning_line, game.winning_line)
+	t.check_eq(copy.history, game.history)
+	t.check_eq(copy.current_player, game.current_player)
+	t.check(copy.is_over())

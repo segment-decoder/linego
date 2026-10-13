@@ -1,5 +1,7 @@
 extends Node2D
-## 게임 화면 (한 기기 2인 대전). 입력 해석과 UI 갱신을 맡고, 규칙은 GameState에 위임한다.
+## 게임 화면. 입력 해석과 UI 갱신을 맡고, 규칙은 GameState에 위임한다.
+## - 한 기기 2인 대전: 행동을 바로 GameState에 적용한다.
+## - 온라인 대전 (Net.in_game()): 행동을 서버로 보내고, 서버가 돌려준 상태로 화면을 갱신한다.
 
 enum Mode { PLACE, LINE_COL, LINE_ROW }
 
@@ -11,9 +13,23 @@ const TAP_SLOP := 24.0
 const NAV_STEP_CELLS := 3
 const NAV_ZOOM_FACTOR := 1.25
 const WHEEL_ZOOM_FACTOR := 1.1
+## 남은 수가 이 이하일 때부터 화면에 표시한다.
+const SHOW_TURNS_LEFT_BELOW := 50
+
+const SERVER_ERROR_TEXT := {
+	"not_your_turn": "상대 차례입니다.",
+	"occupied": "이미 돌이 있는 곳입니다.",
+	"game_over": "이미 끝난 게임입니다.",
+}
 
 var game: GameState
 var mode := Mode.PLACE
+
+var online := false
+## 온라인에서 내 돌 색
+var my_color := 0
+## 행동을 서버에 보내고 응답을 기다리는 중
+var _waiting_server := false
 
 ## 현재 판 위에 있는 손가락들: index -> 화면 좌표
 var _touches := {}
@@ -32,6 +48,8 @@ var _tap_start := Vector2.ZERO
 @onready var nav_pad: Control = %NavPad
 @onready var result_panel: Control = %ResultPanel
 @onready var result_label: Label = %ResultLabel
+@onready var result_info_label: Label = %ResultInfoLabel
+@onready var rematch_button: Button = %RematchButton
 
 
 func _ready() -> void:
@@ -46,7 +64,7 @@ func _ready() -> void:
 	%FitButton.pressed.connect(fit_camera)
 	%HomeButton.pressed.connect(_go_home)
 	%ResultHomeButton.pressed.connect(_go_home)
-	%RematchButton.pressed.connect(new_game)
+	rematch_button.pressed.connect(_on_rematch_pressed)
 
 	%ZoomInButton.pressed.connect(func(): camera.zoom_at(board_area.get_global_rect().get_center(), NAV_ZOOM_FACTOR))
 	%ZoomOutButton.pressed.connect(func(): camera.zoom_at(board_area.get_global_rect().get_center(), 1.0 / NAV_ZOOM_FACTOR))
@@ -56,11 +74,19 @@ func _ready() -> void:
 	%RightButton.pressed.connect(_nav_move.bind(Vector2.RIGHT))
 	nav_pad.visible = Settings.easy_navigation
 
-	new_game()
+	online = Net.in_game()
+	if online:
+		Net.message_received.connect(_on_server_message)
+		Net.disconnected.connect(_on_server_disconnected)
+		my_color = Net.my_color
+		start_game(GameState.from_dict(Net.start_state))
+	else:
+		start_game(GameState.new())
 
 
-func new_game() -> void:
-	game = GameState.new()
+func start_game(new_game: GameState) -> void:
+	game = new_game
+	_waiting_server = false
 	board_view.game = game
 	board_view.preview = {}
 	result_panel.hide()
@@ -142,7 +168,7 @@ func _in_board_area(screen: Vector2) -> bool:
 
 ## 판 위를 탭했을 때. 첫 탭은 미리보기, 같은 곳을 한 번 더 탭하면 확정.
 func handle_tap(screen: Vector2) -> void:
-	if game.is_over():
+	if not can_act():
 		return
 	var local := board_view.to_local(camera.screen_to_world(screen))
 	var action := {}
@@ -169,23 +195,110 @@ func handle_tap(screen: Vector2) -> void:
 
 # --- 행동 적용 -------------------------------------------------------------
 
-func _confirm_preview() -> void:
-	if board_view.preview.is_empty():
-		return
-	apply_action(board_view.preview)
-
-
-func apply_action(action: Dictionary) -> bool:
-	if action.type == "line":
-		_keep_view_stable_for_line(action)
-	if not game.apply(action):
+## 지금 내가 수를 둘 수 있는지 (온라인이면 내 차례이고 서버 응답 대기 중이 아닐 때)
+func can_act() -> bool:
+	if game.is_over():
 		return false
+	return not online or (game.current_player == my_color and not _waiting_server)
+
+
+func _confirm_preview() -> void:
+	if board_view.preview.is_empty() or not can_act():
+		return
+	if online:
+		# 서버가 받아들이면 "state" 메시지로 돌아온다. 그때까지 미리보기를 남겨 둔다.
+		Net.send({"t": "action", "action": board_view.preview})
+		_waiting_server = true
+		_update_ui()
+	else:
+		apply_action(board_view.preview)
+
+
+## 한 기기 대전에서 행동을 바로 적용한다.
+func apply_action(action: Dictionary) -> bool:
+	if game.validate(action) != "":
+		return false
+	var refit := _prepare_view_for(action)
+	game.apply(action)
+	_after_action(refit)
+	return true
+
+
+## 행동 적용 직전에 호출. 판 전체가 보이던 중이면 true(적용 후 다시 전체보기),
+## 아니면 줄 긋기로 밀리는 쪽을 보고 있을 때 카메라를 같이 옮겨 화면이 튀지 않게 한다.
+func _prepare_view_for(action: Dictionary) -> bool:
+	if _board_fully_visible():
+		return true
+	if action.get("type") == "line":
+		_keep_view_stable_for_line(action)
+	return false
+
+
+func _board_fully_visible() -> bool:
+	var rect := board_view.board_rect()
+	var area := board_area.get_global_rect().grow(1.0)
+	return area.has_point(_world_to_screen(rect.position)) and area.has_point(_world_to_screen(rect.end))
+
+
+func _world_to_screen(world: Vector2) -> Vector2:
+	return (world - camera.position) * camera.zoom.x + camera.get_viewport_rect().size / 2.0
+
+
+func _after_action(refit: bool = false) -> void:
 	board_view.preview = {}
 	_update_camera_limits()
+	if refit:
+		fit_camera()
 	_set_mode(Mode.PLACE)
 	if game.is_over():
 		_show_result()
-	return true
+
+
+# --- 온라인 ------------------------------------------------------------------
+
+func _on_server_message(msg: Dictionary) -> void:
+	match msg.get("t"):
+		"state":
+			var refit := _prepare_view_for(GameState.normalize_action(msg.get("last")))
+			game = GameState.from_dict(msg.state)
+			board_view.game = game
+			_waiting_server = false
+			_after_action(refit)
+		"game_start":
+			# 다시 하기: 흑백이 바뀐 새 게임
+			my_color = int(msg.color)
+			start_game(GameState.from_dict(msg.state))
+		"rematch_requested":
+			result_info_label.text = "상대가 한 판 더 원합니다. [다시 하기]를 누르면 시작합니다."
+		"opponent_left":
+			_show_disconnected("상대가 나갔습니다.")
+		"error":
+			_waiting_server = false
+			_update_ui()
+			hint_label.text = SERVER_ERROR_TEXT.get(msg.get("reason"), "서버 오류: %s" % msg.get("reason"))
+
+
+func _on_server_disconnected() -> void:
+	_show_disconnected("서버와 연결이 끊어졌습니다.")
+
+
+func _show_disconnected(text: String) -> void:
+	if not game.is_over():
+		result_label.text = "대국 종료"
+	result_info_label.text = text
+	rematch_button.disabled = true
+	turn_label.text = "게임 종료"
+	confirm_button.disabled = true
+	result_panel.show()
+
+
+func _on_rematch_pressed() -> void:
+	if online:
+		Net.send({"t": "rematch"})
+		rematch_button.disabled = true
+		result_info_label.text = "상대를 기다리는 중..."
+	else:
+		start_game(GameState.new())
 
 
 ## 줄을 그으면 그 뒤쪽 돌들이 한 칸씩 밀린다. 보고 있던 곳이 밀린 쪽이면 카메라도 같이 옮겨
@@ -208,6 +321,8 @@ func _nav_move(direction: Vector2) -> void:
 
 
 func _go_home() -> void:
+	if online:
+		Net.close()
 	get_tree().change_scene_to_file(HOME_SCENE)
 
 
@@ -228,8 +343,18 @@ static func stone_name(stone: int) -> String:
 
 func _update_ui() -> void:
 	var board := game.board
-	turn_label.text = "%s 차례  ·  판 %d×%d" % [stone_name(game.current_player), board.width, board.height]
-	confirm_button.disabled = board_view.preview.is_empty()
+	var turn_text := "%s 차례" % stone_name(game.current_player)
+	if online:
+		var whose := "내" if game.current_player == my_color else "상대"
+		turn_text = "%s 차례 (%s)" % [whose, stone_name(game.current_player)]
+	turn_label.text = "%s  ·  판 %d×%d" % [turn_text, board.width, board.height]
+	if game.turns_left() <= SHOW_TURNS_LEFT_BELOW:
+		turn_label.text += "  ·  남은 수 %d" % game.turns_left()
+
+	var my_turn := can_act()
+	confirm_button.disabled = board_view.preview.is_empty() or not my_turn
+	for button in [place_button, col_button, row_button]:
+		button.disabled = not my_turn
 
 	var hint := ""
 	match mode:
@@ -241,6 +366,8 @@ func _update_ui() -> void:
 			hint = "가로줄을 그을 위치(줄 사이 또는 바깥)를 누르세요."
 	if not board_view.preview.is_empty():
 		hint = "같은 곳을 한 번 더 누르거나 [확정]을 누르세요."
+	if online and not my_turn and not game.is_over():
+		hint = "서버 응답을 기다리는 중..." if _waiting_server else "상대가 두는 중입니다..."
 
 	var me := game.current_player
 	var other := GameState.opponent(me)
@@ -252,7 +379,16 @@ func _update_ui() -> void:
 
 
 func _show_result() -> void:
-	result_label.text = "%s 승리!" % stone_name(game.winner)
+	if game.draw:
+		result_label.text = "무승부"
+		result_info_label.text = "총 %d수에 도달했습니다." % game.max_turns
+	elif online:
+		result_label.text = "승리!" if game.winner == my_color else "패배"
+		result_info_label.text = "[다시 하기]를 누르면 흑백을 바꿔 한 판 더 합니다."
+	else:
+		result_label.text = "%s 승리!" % stone_name(game.winner)
+		result_info_label.text = ""
+	rematch_button.disabled = false
 	turn_label.text = "게임 종료"
 	confirm_button.disabled = true
 	result_panel.show()

@@ -8,6 +8,9 @@ const TEST_SCRIPTS := [
 	"res://tests/test_board_state.gd",
 	"res://tests/test_game_state.gd",
 	"res://tests/test_game_scene.gd",
+	"res://tests/test_server_core.gd",
+	"res://tests/test_network.gd",
+	"res://tests/test_online_scene.gd",
 ]
 
 var failures := 0

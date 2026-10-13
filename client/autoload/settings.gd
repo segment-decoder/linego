@@ -3,20 +3,34 @@ extends Node
 
 const PATH := "user://settings.cfg"
 
+var _loading := false
+
 ## 홈 화면의 "편리한 이동" 옵션. 켜면 게임 화면에 확대/축소, 상하좌우 이동 버튼이 표시된다.
 var easy_navigation := false:
 	set(value):
 		easy_navigation = value
 		save()
 
+## 마지막으로 입력한 서버 주소 (예: 192.168.0.10:8080)
+var server_address := "127.0.0.1:8080":
+	set(value):
+		server_address = value
+		save()
+
 
 func _ready() -> void:
 	var config := ConfigFile.new()
 	if config.load(PATH) == OK:
-		easy_navigation = config.get_value("ui", "easy_navigation", false)
+		_loading = true
+		easy_navigation = config.get_value("ui", "easy_navigation", easy_navigation)
+		server_address = config.get_value("online", "server_address", server_address)
+		_loading = false
 
 
 func save() -> void:
+	if _loading:
+		return
 	var config := ConfigFile.new()
 	config.set_value("ui", "easy_navigation", easy_navigation)
+	config.set_value("online", "server_address", server_address)
 	config.save(PATH)
