@@ -1,0 +1,224 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/game/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scenes/game/board_view.gd" id="2_view"]
+[ext_resource type="Script" path="res://scenes/game/board_camera.gd" id="3_camera"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar"]
+content_margin_left = 24.0
+content_margin_top = 20.0
+content_margin_right = 24.0
+content_margin_bottom = 20.0
+bg_color = Color(0.12, 0.12, 0.14, 0.92)
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_game")
+
+[node name="BoardView" type="Node2D" parent="."]
+script = ExtResource("2_view")
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("3_camera")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Layout" type="VBoxContainer" parent="HUD/Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="TopBar" type="PanelContainer" parent="HUD/Root/Layout"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
+
+[node name="HBox" type="HBoxContainer" parent="HUD/Root/Layout/TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HomeButton" type="Button" parent="HUD/Root/Layout/TopBar/HBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 96)
+layout_mode = 2
+text = "홈"
+
+[node name="TurnLabel" type="Label" parent="HUD/Root/Layout/TopBar/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "흑 차례"
+horizontal_alignment = 1
+
+[node name="FitButton" type="Button" parent="HUD/Root/Layout/TopBar/HBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 96)
+layout_mode = 2
+text = "전체보기"
+
+[node name="BoardArea" type="Control" parent="HUD/Root/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="BottomBar" type="PanelContainer" parent="HUD/Root/Layout"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Root/Layout/BottomBar"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HintLabel" type="Label" parent="HUD/Root/Layout/BottomBar/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+text = "교차점을 눌러 돌을 놓을 곳을 고르세요."
+autowrap_mode = 3
+
+[node name="ModeBar" type="HBoxContainer" parent="HUD/Root/Layout/BottomBar/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="PlaceButton" type="Button" parent="HUD/Root/Layout/BottomBar/VBox/ModeBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "돌 놓기"
+
+[node name="ColButton" type="Button" parent="HUD/Root/Layout/BottomBar/VBox/ModeBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "세로줄"
+
+[node name="RowButton" type="Button" parent="HUD/Root/Layout/BottomBar/VBox/ModeBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "가로줄"
+
+[node name="ConfirmButton" type="Button" parent="HUD/Root/Layout/BottomBar/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+disabled = true
+text = "확정"
+
+[node name="NavPad" type="GridContainer" parent="HUD/Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -380.0
+offset_top = -180.0
+offset_right = -20.0
+offset_bottom = 180.0
+grow_horizontal = 0
+grow_vertical = 2
+columns = 3
+
+[node name="ZoomInButton" type="Button" parent="HUD/Root/NavPad"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 110)
+layout_mode = 2
+text = "+"
+
+[node name="UpButton" type="Button" parent="HUD/Root/NavPad"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 110)
+layout_mode = 2
+text = "▲"
+
+[node name="ZoomOutButton" type="Button" parent="HUD/Root/NavPad"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 110)
+layout_mode = 2
+text = "−"
+
+[node name="LeftButton" type="Button" parent="HUD/Root/NavPad"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 110)
+layout_mode = 2
+text = "◀"
+
+[node name="Spacer" type="Control" parent="HUD/Root/NavPad"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="RightButton" type="Button" parent="HUD/Root/NavPad"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 110)
+layout_mode = 2
+text = "▶"
+
+[node name="Spacer2" type="Control" parent="HUD/Root/NavPad"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="DownButton" type="Button" parent="HUD/Root/NavPad"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 110)
+layout_mode = 2
+text = "▼"
+
+[node name="ResultPanel" type="PanelContainer" parent="HUD/Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -240.0
+offset_right = 360.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bar")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Root/ResultPanel"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="ResultLabel" type="Label" parent="HUD/Root/ResultPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 72
+text = "흑 승리!"
+horizontal_alignment = 1
+
+[node name="RematchButton" type="Button" parent="HUD/Root/ResultPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+text = "다시 하기"
+
+[node name="ResultHomeButton" type="Button" parent="HUD/Root/ResultPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+text = "홈으로"

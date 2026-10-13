@@ -10,31 +10,31 @@ config_version=5
 
 [application]
 
-config/name="linego"
-run/main_scene="uid://dufvw0a70mmnd"
-config/features=PackedStringArray("4.4", "Mobile")
-config/icon="res://linego_client/icon.svg"
+config/name="Linego"
+run/main_scene="res://scenes/home/home.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Settings="*res://autoload/settings.gd"
 
 [display]
 
 window/size/viewport_width=1080
 window/size/viewport_height=1920
+window/size/window_width_override=540
+window/size/window_height_override=960
 window/stretch/mode="canvas_items"
+window/handheld/orientation=1
 
-[input]
+[gui]
 
-touch_action={
-"deadzone": 0.2,
-"events": []
-}
-place_stone={
-"deadzone": 0.2,
-"events": []
-}
-add_line={
-"deadzone": 0.2,
-"events": []
-}
+theme/custom="res://ui/theme.tres"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
 
 [rendering]
 
