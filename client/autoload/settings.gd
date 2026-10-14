@@ -11,14 +11,14 @@ var easy_navigation := false:
 		easy_navigation = value
 		save()
 
-## 한 기기 대전 시간 제한 (각자 5분). 끄면 총 450수 제한으로 끝난다.
+## 한 기기 대전 시간 제한 (각자 10분). 끄면 총 450수 제한으로 끝난다.
 var local_clock := true:
 	set(value):
 		local_clock = value
 		save()
 
 ## 온라인 방을 만들 때 고른 시간 (분)
-var online_minutes := 5:
+var online_minutes := ChessClock.DEFAULT_MINUTES:
 	set(value):
 		online_minutes = value
 		save()
