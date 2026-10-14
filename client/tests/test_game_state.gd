@@ -5,6 +5,16 @@ const Stone := BoardState.Stone
 var t  # 테스트 러너
 
 
+## 오프닝(4×4를 돌로 채우기)을 끝낸 게임. 흑 8, 백 8, 5목 없음. 흑 차례.
+func _after_opening() -> GameState:
+	var game := GameState.new()
+	var order := [[0, 0], [2, 0], [1, 0], [3, 0], [2, 1], [0, 1], [3, 1], [1, 1],
+		[0, 2], [2, 2], [1, 2], [3, 2], [2, 3], [0, 3], [3, 3], [1, 3]]
+	for p in order:
+		game.apply(GameState.place_action(p[0], p[1]))
+	return game
+
+
 func _game_with(text: String, player: int = Stone.BLACK) -> GameState:
 	var game := GameState.new()
 	game.board = BoardState.from_text(text)
@@ -17,23 +27,48 @@ func test_black_moves_first_and_turns_alternate() -> void:
 	t.check_eq(game.current_player, Stone.BLACK)
 	t.check(game.apply(GameState.place_action(0, 0)))
 	t.check_eq(game.current_player, Stone.WHITE)
-	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 4)))
+	t.check(game.apply(GameState.place_action(1, 0)))
 	t.check_eq(game.current_player, Stone.BLACK)
-	t.check_eq(game.board.width, 5)
 	t.check_eq(game.history.size(), 2)
 
 
-func test_invalid_actions_are_rejected() -> void:
+func test_opening_rule_experiment_allows_only_stones_until_4x4_is_full() -> void:
 	var game := GameState.new()
-	game.apply(GameState.place_action(1, 1))
+	game.opening_rule = true
+	t.check(game.in_opening())
+	t.check_eq(game.validate(GameState.line_action(GameState.AXIS_COL, 0)), "opening")
+	t.check(not game.apply(GameState.line_action(GameState.AXIS_COL, 0)))
+	game = _after_opening()
+	game.opening_rule = true
+	t.check(not game.in_opening(), "16칸을 채우면 오프닝 끝")
+	t.check_eq(game.turn_count(), 16)
+	t.check_eq(game.current_player, Stone.BLACK, "17수째는 흑")
+	t.check(not game.is_over(), "4×4에서는 5목이 나올 수 없다")
+	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 4)))
+	t.check_eq(game.board.width, 5)
+	t.check(not game.in_opening(), "판이 커진 뒤에는 다시 오프닝이 되지 않는다")
+
+
+func test_opening_rule_survives_json() -> void:
+	var game := GameState.new()
+	game.opening_rule = true
+	game.apply(GameState.place_action(0, 0))
+	t.check(GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict()))).in_opening())
+
+
+func test_invalid_actions_are_rejected() -> void:
+	var game := _after_opening()
 	t.check_eq(game.validate(GameState.place_action(1, 1)), "occupied")
 	t.check_eq(game.validate(GameState.place_action(4, 0)), "out_of_board")
 	t.check_eq(game.validate(GameState.line_action(GameState.AXIS_COL, 5)), "bad_index")
 	t.check_eq(game.validate(GameState.line_action(GameState.AXIS_ROW, -1)), "bad_index")
-	t.check_eq(game.validate(GameState.line_action("diag", 0)), "bad_axis")
-	t.check_eq(game.validate({"type": "pass"}), "bad_type")
+	t.check_eq(game.validate(GameState.line_action("diag", 0)), "bad_action")
+	t.check_eq(game.validate({"type": "pass"}), "bad_action")
+	t.check_eq(game.validate({"type": "place", "x": "1", "y": 2}), "bad_action", "문자열 좌표")
+	t.check_eq(game.validate({"type": "place", "x": null}), "bad_action")
+	t.check_eq(game.validate("place"), "bad_action")
 	t.check(not game.apply(GameState.place_action(1, 1)))
-	t.check_eq(game.current_player, Stone.WHITE, "실패한 행동은 턴을 넘기지 않는다")
+	t.check_eq(game.current_player, Stone.BLACK, "실패한 행동은 턴을 넘기지 않는다")
 
 
 func test_placing_fifth_stone_wins() -> void:
@@ -85,7 +120,8 @@ func test_only_the_mover_can_win() -> void:
 	game.apply(GameState.line_action(GameState.AXIS_COL, 1))
 	t.check(game.board.has_exact_five(Stone.WHITE))
 	t.check_eq(game.current_player, Stone.WHITE)
-	game.apply(GameState.place_action(1, 1))
+	# 흑이 그은 열 1은 백에게 잠겨 있으므로 다른 곳에 둔다.
+	game.apply(GameState.place_action(3, 1))
 	t.check_eq(game.winner, Stone.WHITE)
 
 
@@ -99,7 +135,114 @@ func test_mover_does_not_win_with_only_opponent_five() -> void:
 func test_state_survives_json() -> void:
 	var game := GameState.new()
 	game.apply(GameState.place_action(0, 0))
-	game.apply(GameState.line_action(GameState.AXIS_ROW, 0))
+	game.apply(GameState.place_action(1, 0))
 	var data: Dictionary = JSON.parse_string(JSON.stringify(game.to_dict()))
 	t.check_eq(BoardState.from_dict(data.board).to_text(), game.board.to_text())
 	t.check_eq(int(data.current_player), Stone.BLACK)
+
+
+func test_json_numbers_are_accepted() -> void:
+	# 네트워크로 오면 숫자가 float이 된다.
+	var game := GameState.new()
+	t.check(game.apply({"type": "place", "x": 1.0, "y": 2.0, "extra": true}))
+	t.check_eq(game.history[0], GameState.place_action(1, 2), "정규화되어 저장된다")
+
+
+func test_draw_at_turn_limit() -> void:
+	var game := GameState.new()
+	game.max_turns = 3
+	game.apply(GameState.place_action(0, 0))
+	game.apply(GameState.place_action(1, 0))
+	t.check(not game.is_over())
+	t.check_eq(game.turns_left(), 1)
+	game.apply(GameState.place_action(2, 0))
+	t.check(game.draw, "제한 수에 도달하면 무승부")
+	t.check(game.is_over())
+	t.check_eq(game.winner, Stone.EMPTY)
+	t.check_eq(game.validate(GameState.place_action(2, 2)), "game_over")
+
+
+func test_win_on_last_turn_beats_draw() -> void:
+	var game := _game_with("XXXX.\n.....")
+	game.max_turns = 1
+	game.apply(GameState.place_action(4, 0))
+	t.check_eq(game.winner, Stone.BLACK)
+	t.check(not game.draw)
+
+
+func test_default_turn_limit_is_450() -> void:
+	t.check_eq(GameState.new().max_turns, 450)
+
+
+func test_from_dict_restores_everything() -> void:
+	var game := _game_with("XXXX..\n......")
+	game.apply(GameState.place_action(4, 0))
+	var copy := GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict())))
+	t.check_eq(copy.board.to_text(), game.board.to_text())
+	t.check_eq(copy.winner, Stone.BLACK)
+	t.check_eq(copy.winning_line, game.winning_line)
+	t.check_eq(copy.history, game.history)
+	t.check_eq(copy.current_player, game.current_player)
+	t.check(copy.is_over())
+
+
+func test_freeze_rule_blocks_opponent_for_one_turn() -> void:
+	var game := _after_opening()
+	game.freeze_new_line = true
+	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 2)), "흑 17수째 줄")
+	t.check_eq(game.validate(GameState.place_action(2, 0)), "frozen", "백은 새 줄 위에 바로 놓을 수 없다")
+	t.check(game.apply(GameState.line_action(GameState.AXIS_ROW, 4)), "백은 줄을 그을 수 있다")
+	# 흑 차례: 흑의 줄(열 2)은 풀렸고, 백이 그은 줄(행 4)은 흑에게 잠겼다.
+	t.check_eq(game.validate(GameState.place_action(2, 0)), "", "줄을 그은 쪽은 자기 다음 차례에 놓을 수 있다")
+	t.check_eq(game.validate(GameState.place_action(0, 4)), "frozen")
+	t.check(game.apply(GameState.place_action(2, 0)))
+	t.check(game.frozen_line.is_empty(), "막힌 쪽이 한 수 두면 풀린다")
+	t.check_eq(game.validate(GameState.place_action(0, 4)), "", "백 차례에는 행 4가 열려 있다")
+
+
+func test_freeze_cut_makes_line_a_defense() -> void:
+	# 백의 열린 4목을 흑이 줄로 끊으면, 빈칸이 백에게 잠겨 백이 바로 이길 수 없다.
+	var game := _game_with(".OOOO..\n.......\nXX.X...")
+	game.freeze_new_line = true
+	game.apply(GameState.line_action(GameState.AXIS_COL, 3))
+	t.check_eq(game.board.to_text().split("\n")[0], ".OO.OO..")
+	t.check_eq(game.validate(GameState.place_action(3, 0)), "frozen")
+	t.check(game.apply(GameState.place_action(0, 0)), "백은 다른 곳에 둔다")
+	t.check_eq(game.winner, Stone.EMPTY, "양 끝에 두어도 5목이 아니다")
+
+
+func test_freeze_is_on_by_default_and_can_be_turned_off() -> void:
+	t.check(GameState.new().freeze_new_line, "정식 규칙")
+	var game := _after_opening()
+	game.freeze_new_line = false
+	game.apply(GameState.line_action(GameState.AXIS_COL, 2))
+	t.check_eq(game.validate(GameState.place_action(2, 0)), "")
+
+
+func test_freeze_state_survives_json() -> void:
+	var game := _after_opening()
+	game.freeze_new_line = true
+	game.apply(GameState.line_action(GameState.AXIS_COL, 1))
+	var copy := GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict())))
+	t.check(copy.freeze_new_line)
+	t.check_eq(copy.validate(GameState.place_action(1, 0)), "frozen")
+
+
+func test_timeout_loses_and_unlimited_turns() -> void:
+	var game := GameState.new()
+	game.max_turns = 0
+	t.check_eq(game.turns_left(), -1, "제한 없음")
+	game.apply(GameState.place_action(0, 0))
+	game.timeout(Stone.WHITE)
+	t.check_eq(game.winner, Stone.BLACK)
+	t.check_eq(game.end_reason, "timeout")
+	t.check(game.is_over())
+	t.check_eq(game.validate(GameState.place_action(1, 1)), "game_over")
+
+
+func test_no_opening_by_default() -> void:
+	var game := GameState.new()
+	t.check(not game.opening_rule, "정식 규칙에는 오프닝이 없다")
+	t.check(not game.in_opening())
+	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 0)), "오프닝이 없으면 첫 수부터 줄 긋기 가능")
+	t.check(not GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict()))).opening_rule)

@@ -36,19 +36,37 @@ func test_tap_twice_places_stone() -> void:
 func test_line_mode_inserts_column_and_keeps_stone_in_view() -> void:
 	var scene: Node = await _spawn()
 	var view: BoardView = scene.board_view
+	scene.game.board = BoardState.new(12, 12)
+	view.game = scene.game
+	scene.fit_camera()
 	scene.apply_action(GameState.place_action(3, 0))
+	# 확대해서 판 일부만 보는 중에는, 보던 쪽 돌이 화면에서 튀지 않아야 한다.
+	scene.camera.zoom_at(_world_to_screen(scene, view.intersection_position(3, 0)), 3.0)
+	t.check(not scene._board_fully_visible(), "확대 상태")
 	var before := _world_to_screen(scene, view.intersection_position(3, 0))
 	scene.col_button.pressed.emit()
-	# 카메라 중심(1.5칸)보다 왼쪽에 줄을 그으면, 카메라가 보던 오른쪽 부분이 화면에 고정되어야 한다.
 	var gap := _world_to_screen(scene, Vector2(view.gap_coordinate(1), view.CELL))
 	scene.handle_tap(gap)
 	t.check_eq(view.preview, GameState.line_action(GameState.AXIS_COL, 1))
 	scene.confirm_button.pressed.emit()
-	t.check_eq(scene.game.board.width, 5)
+	t.check_eq(scene.game.board.width, 13)
 	t.check_eq(scene.game.board.get_stone(4, 0), Stone.BLACK, "줄 오른쪽 돌은 한 칸 밀린다")
 	t.check_eq(scene.mode, scene.Mode.PLACE, "행동 후 돌 놓기 모드로 돌아간다")
 	var after := _world_to_screen(scene, view.intersection_position(4, 0))
 	t.check(before.distance_to(after) < 1.0, "밀린 돌이 화면에서 같은 자리에 보여야 한다")
+	scene.queue_free()
+
+
+func test_line_refits_when_whole_board_was_visible() -> void:
+	var scene: Node = await _spawn()
+	t.check(scene._board_fully_visible(), "시작하면 판 전체가 보인다")
+	t.check(not scene.col_button.disabled, "첫 수부터 줄을 그을 수 있다")
+	scene.game.board = BoardState.from_text("XXOO\nOOXX\nXXOO\nOOXX")
+	scene.board_view.game = scene.game
+	scene.apply_action(GameState.line_action(GameState.AXIS_COL, 0))
+	scene.apply_action(GameState.line_action(GameState.AXIS_ROW, 4))
+	t.check_eq(scene.game.board.width, 5)
+	t.check(scene._board_fully_visible(), "줄을 그은 뒤에도 판 전체가 보이도록 다시 맞춘다")
 	scene.queue_free()
 
 

@@ -2,15 +2,20 @@ extends Control
 ## 홈 화면
 
 const GAME_SCENE := "res://scenes/game/game.tscn"
+const LOBBY_SCENE := "res://scenes/lobby/lobby.tscn"
 const RULES_TEXT := """목표: 가로·세로·대각선으로 내 돌을 정확히 5개 이으면 승리. 6목 이상은 승리가 아닙니다.
 
-시작: 4×4 판에서 시작합니다. 5목을 만들려면 판을 넓혀야 합니다.
+시작: 4×4 판에서 시작합니다. 첫 수부터 돌 놓기와 줄 긋기 중 하나를 할 수 있습니다.
 
 내 차례에는 둘 중 하나만 합니다.
  ① 돌 놓기: 빈 교차점에 돌을 놓습니다.
  ② 줄 긋기: 줄과 줄 사이, 또는 판 바깥에 세로줄이나 가로줄을 하나 긋습니다. 그 뒤쪽 돌들이 한 칸씩 밀려 간격이 벌어집니다.
+ ※ 새 줄 잠금: 방금 그은 새 줄 위에는 상대가 바로 다음 차례에 돌을 놓을 수 없습니다. (그은 사람은 다음 차례에 놓을 수 있습니다)
 
 승리는 돌을 놓은 직후에만 판정합니다. 줄을 그어 5목이 생겨도 그 턴에는 이기지 않고, 다음 내 턴에 5목을 망가뜨리지 않는 곳에 돌을 놓으면 승리합니다.
+
+시간: 각자 5분(온라인은 방을 만들 때 3/5/10분 선택). 자기 차례에만 시간이 줄고, 다 쓰면 집니다. 수 제한은 없습니다.
+한 기기 대전에서 시간 제한을 끄면, 두 사람의 수를 합쳐 %d수가 되면 무승부입니다.
 
 판 이동: 두 손가락으로 확대·축소·이동할 수 있습니다."""
 
@@ -20,11 +25,14 @@ const RULES_TEXT := """목표: 가로·세로·대각선으로 내 돌을 정확
 
 func _ready() -> void:
 	%LocalGameButton.pressed.connect(_start_local_game)
+	%OnlineGameButton.pressed.connect(get_tree().change_scene_to_file.bind(LOBBY_SCENE))
 	%RulesButton.pressed.connect(rules_dialog.popup_centered)
 	%QuitButton.pressed.connect(get_tree().quit)
+	%LocalClockCheck.button_pressed = Settings.local_clock
+	%LocalClockCheck.toggled.connect(func(on: bool): Settings.local_clock = on)
 	easy_nav_check.button_pressed = Settings.easy_navigation
 	easy_nav_check.toggled.connect(func(on: bool): Settings.easy_navigation = on)
-	rules_dialog.dialog_text = RULES_TEXT
+	rules_dialog.dialog_text = RULES_TEXT % GameState.MAX_TURNS
 
 
 func _start_local_game() -> void:
