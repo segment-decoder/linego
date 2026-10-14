@@ -60,7 +60,7 @@ func test_line_mode_inserts_column_and_keeps_stone_in_view() -> void:
 func test_line_refits_when_whole_board_was_visible() -> void:
 	var scene: Node = await _spawn()
 	t.check(scene._board_fully_visible(), "시작하면 판 전체가 보인다")
-	t.check(scene.col_button.disabled, "오프닝 중에는 줄 버튼이 꺼진다")
+	t.check(not scene.col_button.disabled, "첫 수부터 줄을 그을 수 있다")
 	scene.game.board = BoardState.from_text("XXOO\nOOXX\nXXOO\nOOXX")
 	scene.board_view.game = scene.game
 	scene.apply_action(GameState.line_action(GameState.AXIS_COL, 0))

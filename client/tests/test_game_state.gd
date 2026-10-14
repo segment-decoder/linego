@@ -32,12 +32,14 @@ func test_black_moves_first_and_turns_alternate() -> void:
 	t.check_eq(game.history.size(), 2)
 
 
-func test_opening_allows_only_stones_until_4x4_is_full() -> void:
+func test_opening_rule_experiment_allows_only_stones_until_4x4_is_full() -> void:
 	var game := GameState.new()
+	game.opening_rule = true
 	t.check(game.in_opening())
 	t.check_eq(game.validate(GameState.line_action(GameState.AXIS_COL, 0)), "opening")
 	t.check(not game.apply(GameState.line_action(GameState.AXIS_COL, 0)))
 	game = _after_opening()
+	game.opening_rule = true
 	t.check(not game.in_opening(), "16칸을 채우면 오프닝 끝")
 	t.check_eq(game.turn_count(), 16)
 	t.check_eq(game.current_player, Stone.BLACK, "17수째는 흑")
@@ -47,8 +49,9 @@ func test_opening_allows_only_stones_until_4x4_is_full() -> void:
 	t.check(not game.in_opening(), "판이 커진 뒤에는 다시 오프닝이 되지 않는다")
 
 
-func test_opening_survives_json() -> void:
+func test_opening_rule_survives_json() -> void:
 	var game := GameState.new()
+	game.opening_rule = true
 	game.apply(GameState.place_action(0, 0))
 	t.check(GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict()))).in_opening())
 
@@ -237,9 +240,9 @@ func test_timeout_loses_and_unlimited_turns() -> void:
 	t.check_eq(game.validate(GameState.place_action(1, 1)), "game_over")
 
 
-func test_opening_rule_can_be_turned_off() -> void:
+func test_no_opening_by_default() -> void:
 	var game := GameState.new()
-	game.opening_rule = false
+	t.check(not game.opening_rule, "정식 규칙에는 오프닝이 없다")
 	t.check(not game.in_opening())
 	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 0)), "오프닝이 없으면 첫 수부터 줄 긋기 가능")
 	t.check(not GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict()))).opening_rule)

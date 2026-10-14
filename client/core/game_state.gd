@@ -36,8 +36,9 @@ var max_turns := MAX_TURNS
 ## 새 줄 잠금: 새로 그은 줄 위에는 그 줄을 그은 사람의 상대가 바로 다음 차례에 돌을 놓을 수 없다.
 ## (정식 규칙. 실험에서 끌 수 있게 옵션으로 둔다)
 var freeze_new_line := true
-## 오프닝(4×4를 돌로 채울 때까지 돌 놓기만) 적용 여부. 정식 규칙이며 실험에서만 끈다.
-var opening_rule := true
+## [실험용] 오프닝(4×4를 돌로 채울 때까지 돌 놓기만). 정식 규칙에서는 쓰지 않는다.
+## (2026-10-14 채택했다가, 흑 우위는 새 줄 잠금만으로 해소되어 같은 날 제외. docs/EXPERIMENTS.md)
+var opening_rule := false
 ## 지금 잠긴 줄: {"axis", "index", "blocked": 놓을 수 없는 색}. 없으면 빈 Dictionary.
 var frozen_line := {}
 
@@ -50,7 +51,7 @@ func is_over() -> bool:
 	return winner != Stone.EMPTY or draw
 
 
-## 오프닝: 처음 4×4 판을 돌로 모두 채울 때까지는 돌 놓기만 할 수 있다.
+## [실험용] 오프닝 중인가: 처음 4×4 판을 돌로 모두 채울 때까지는 돌 놓기만 할 수 있다.
 ## (오프닝 동안은 줄을 그을 수 없으므로 판은 4×4 그대로이고, 16수를 두면 꽉 찬다)
 func in_opening() -> bool:
 	return opening_rule and board.width == START_SIZE and board.height == START_SIZE and not board.is_full()
@@ -196,7 +197,7 @@ static func from_dict(data: Dictionary) -> GameState:
 	game.max_turns = int(data.get("max_turns", MAX_TURNS))
 	game.end_reason = str(data.get("end_reason", ""))
 	game.freeze_new_line = bool(data.get("freeze_new_line", true))
-	game.opening_rule = bool(data.get("opening_rule", true))
+	game.opening_rule = bool(data.get("opening_rule", false))
 	var frozen: Dictionary = data.get("frozen_line", {})
 	if not frozen.is_empty():
 		game.frozen_line = {"axis": str(frozen.axis), "index": int(frozen.index), "blocked": int(frozen.blocked)}

@@ -88,15 +88,11 @@ func test_actions_are_validated_and_broadcast() -> void:
 		t.check_eq(msg.turn, 1)
 		t.check(not msg.has("state"), "판 전체는 보내지 않는다")
 
-	out = _send(B, {"t": "action", "action": GameState.line_action(GameState.AXIS_COL, 0)})
-	t.check_eq(_to(out, B)[0].reason, "opening", "오프닝 중에는 서버도 줄 긋기를 거부한다")
-
 	var game: GameState = core.rooms.values()[0].game
-	game.board = BoardState.from_text("XXOO\nOOXX\nXXOO\nOOXX")
 	out = _send(B, {"t": "action", "action": GameState.line_action(GameState.AXIS_COL, 0)})
 	t.check_eq(_to(out, A)[0].turn, 2)
 	t.check_eq(game.board.width, 5)
-	t.check_eq(game.board.get_stone(2, 0), Stone.BLACK, "줄 긋기도 서버에서 적용된다")
+	t.check_eq(game.board.get_stone(2, 2), Stone.BLACK, "줄 긋기도 서버에서 적용된다")
 	t.check_eq(game.current_player, Stone.BLACK)
 
 

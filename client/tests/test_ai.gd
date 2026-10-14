@@ -73,14 +73,17 @@ func test_splits_own_six_into_five() -> void:
 
 
 func test_does_not_open_space_for_opponent_four() -> void:
-	# 백이 세로로 4개(판 높이 4). 가장자리에 가로줄을 그으면 백에게 5번째 칸을 만들어 준다.
+	# 백이 세로로 4개(판 높이 4). 가로줄을 그으면 백에게 5번째 칸이 생긴다.
+	# 잠금이 없으면 그 칸을 백이 바로 채우고, 잠금이 있으면 그 칸이 새 줄 위에 있을 때만 안전하다.
 	_for_each_style(func(ai: LinegoAI, name: String):
 		for i in 20:
 			ai.rng.seed = i
-			var game := _game("O.X.\nO...\nO.X.\nO...", Stone.BLACK)
-			var action := ai.choose(game)
-			if action.type == "line":
-				t.check(not LinegoAI._gives_immediate_win(game.board, action, Stone.WHITE), "%s: %s" % [name, action]))
+			for freeze in [false, true]:
+				var game := _game("O.X.\nO...\nO.X.\nO...", Stone.BLACK)
+				game.freeze_new_line = freeze
+				var action := ai.choose(game)
+				if action.type == "line":
+					t.check(not LinegoAI._opponent_wins_after_line(game.board, action, Stone.WHITE, freeze), "%s freeze=%s: %s" % [name, freeze, action]))
 
 
 func test_place_only_mode() -> void:
