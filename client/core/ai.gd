@@ -163,13 +163,27 @@ func _line_attack_value(board: BoardState, action: Dictionary, me: int, op: int)
 	var on_line := _cells_on_line(winning_cells(after, me, _band_around(after, action)), action)
 	if on_line.is_empty():
 		return 0.0
-	for counter in _all_line_actions(after):
+	# 5단계에서는 줄 전에 내 승리 지점이 없었으므로, 승리 지점은 내 줄 주변에만 생긴다.
+	# 상대의 되받기 줄이 바꿀 수 있는 곳도 그 줄 주변뿐이라, 두 띠만 확인하면 된다.
+	for counter in _line_candidates(after):
 		var after2 := _after(after, counter)
+		var my_band := _band_around(after2, _shifted_by(action, counter))
+		var counter_band := _band_around(after2, counter)
+		if _has_five_in(after2, me, my_band) or _has_five_in(after2, me, counter_band):
+			continue
+		var wins := winning_cells(after2, me, my_band)
+		wins.append_array(winning_cells(after2, me, counter_band))
 		# 상대가 되받은 줄은 이번엔 나에게 잠긴다.
-		var my_wins := winning_cells(after2, me)
-		if _cells_off_line(my_wins, counter).is_empty() and not after2.has_exact_five(me):
+		if _cells_off_line(wins, counter).is_empty():
 			return LINE_ATTACK_SCORE
 	return FIVE_SCORE
+
+
+## 먼저 그은 줄 line이, 뒤에 그은 줄 later 때문에 밀린 위치
+static func _shifted_by(line: Dictionary, later: Dictionary) -> Dictionary:
+	if line.axis == later.axis and later.index <= line.index:
+		return GameState.line_action(line.axis, line.index + 1)
+	return line
 
 
 static func _on_line(cell: Vector2i, action: Dictionary) -> bool:

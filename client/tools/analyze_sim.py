@@ -46,6 +46,16 @@ def summarize(rows):
     out.append(
         f"  승리 방식: 착수로 5목 {win_kinds['placement']}판, 줄로 만든 5목 {win_kinds['line_five']}판"
     )
+    early = sum(1 for r in rows if 17 <= r["turns"] <= 22)
+    out.append(f"  오프닝 직후(17~22수) 승부 {pct(early, n)}")
+    lb = sum(r["black_stats"].get("line_blocks", 0) + r["white_stats"].get("line_blocks", 0) for r in rows)
+    la = sum(r["black_stats"].get("line_attacks", 0) + r["white_stats"].get("line_attacks", 0) for r in rows)
+    streaks = [r.get("max_line_streak", 0) for r in rows]
+    out.append(f"  줄로 막기 {lb}회 (판당 {lb / n:.1f})  ·  줄 공격 {la}회 (판당 {la / n:.1f})  ·  연속 줄 공방 최대 평균 {statistics.mean(streaks):.1f}")
+    attacked = [r for r in rows if r.get("first_line_attack_by")]
+    if attacked:
+        first_wins = sum(1 for r in attacked if r["winner"] == r["first_line_attack_by"])
+        out.append(f"  줄 공격을 먼저 한 쪽의 승률 {pct(first_wins, len(attacked))} ({len(attacked)}판)")
     out.append(
         f"  줄로 5목 만들기 {line_fives}회 ({sum(1 for r in rows if r['black_stats']['line_fives'] + r['white_stats']['line_fives'])}판)"
         f"  ·  상대 5목을 줄로 끊기 {cuts}회  ·  4목 막기 {blocks}회 (판당 {blocks / n:.1f})"
@@ -81,10 +91,11 @@ def main(paths):
             for line in f:
                 if line.strip():
                     r = json.loads(line)
-                    rows_by_exp[r["experiment"]].append(r)
-    for exp in sorted(rows_by_exp):
-        rows = rows_by_exp[exp]
-        print(f"== {NAMES.get(exp, exp)}")
+                    rows_by_exp[(r.get("freeze", False), r["experiment"])].append(r)
+    for key in sorted(rows_by_exp):
+        freeze, exp = key
+        rows = rows_by_exp[key]
+        print(f"== {'[새 줄 잠금] ' if freeze else ''}{NAMES.get(exp, exp)}")
         print(summarize(rows))
         if exp in (3, 4):
             print(by_matchup(rows))
