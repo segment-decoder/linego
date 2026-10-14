@@ -30,6 +30,11 @@ func _init(w: int = 4, h: int = 4) -> void:
 	_cells.fill(Stone.EMPTY)
 
 
+## 판 데이터 (y * width + x). AI처럼 빠른 접근이 필요한 곳에서 읽기 전용으로 쓴다.
+func cells() -> PackedByteArray:
+	return _cells
+
+
 func is_inside(x: int, y: int) -> bool:
 	return x >= 0 and x < width and y >= 0 and y < height
 
@@ -58,12 +63,11 @@ func is_full() -> bool:
 func insert_column(index: int) -> void:
 	assert(index >= 0 and index <= width)
 	var new_cells := PackedByteArray()
-	new_cells.resize((width + 1) * height)
-	new_cells.fill(Stone.EMPTY)
 	for y in height:
-		for x in width:
-			var nx := x if x < index else x + 1
-			new_cells[y * (width + 1) + nx] = _cells[y * width + x]
+		var row_start := y * width
+		new_cells.append_array(_cells.slice(row_start, row_start + index))
+		new_cells.append(Stone.EMPTY)
+		new_cells.append_array(_cells.slice(row_start + index, row_start + width))
 	width += 1
 	_cells = new_cells
 

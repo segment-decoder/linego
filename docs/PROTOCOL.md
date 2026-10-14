@@ -1,9 +1,11 @@
-# 온라인 프로토콜 (v1)
+# 온라인 프로토콜 (v2)
 
 WebSocket 텍스트 메시지, 내용은 JSON 객체. 모든 메시지에 `"t"`(종류)가 있다.
 서버 구현: `client/server/server_core.gd`, 클라이언트: `client/autoload/net.gd`.
 
-서버가 **권위**를 가진다. 클라이언트는 행동을 요청만 하고, 판 상태는 서버가 보내 준 것만 믿는다.
+서버가 **권위**를 가진다. 클라이언트는 행동을 요청만 하고, 서버가 확정한 수(`move`)만 판에 적용한다.
+판 전체는 게임 시작 때만 보내고, 이후에는 수 하나씩 보낸다. 양쪽이 같은 규칙 코드(`core/`)로 적용하므로
+판이 아무리 커져도 메시지 크기가 일정하다.
 
 ## 클라이언트 → 서버
 
@@ -15,7 +17,7 @@ WebSocket 텍스트 메시지, 내용은 JSON 객체. 모든 메시지에 `"t"`(
 | `rematch` | | 게임이 끝난 뒤 다시 하기. 두 사람 모두 보내면 흑백을 바꿔 `game_start` |
 | `leave` | | 방에서 나간다 (연결을 끊어도 같음) |
 
-`v`는 프로토콜 버전(현재 1). 다르면 `error: version_mismatch`.
+`v`는 프로토콜 버전(현재 2). 다르면 `error: version_mismatch`.
 
 ## 서버 → 클라이언트
 
@@ -23,7 +25,7 @@ WebSocket 텍스트 메시지, 내용은 JSON 객체. 모든 메시지에 `"t"`(
 |---|---|---|
 | `room_created` | `code` | 4자리 방 코드 (헷갈리는 0/O/1/I/L 제외) |
 | `game_start` | `code`, `color`, `state` | `color`: 1=흑, 2=백. `state`: `GameState.to_dict()` |
-| `state` | `state`, `last`, `by` | 수가 적용된 뒤 두 사람 모두에게. 판 전체 상태를 매번 보낸다 |
+| `move` | `action`, `by`, `turn` | 서버가 확정한 수. 두 사람 모두에게. `turn`은 적용 후 총 수 — 클라이언트의 수와 다르면 동기화 오류 |
 | `rematch_requested` | | 상대가 다시 하기를 눌렀다 |
 | `opponent_left` | | 상대가 나갔다. 방은 닫힌다 |
 | `error` | `reason` | `bad_message`, `version_mismatch`, `no_such_room`, `room_full`, `already_in_room`, `not_in_game`, `not_your_turn`, `game_over`, `cannot_rematch`, `bad_action`, `out_of_board`, `occupied`, `bad_index` |

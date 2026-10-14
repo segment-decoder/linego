@@ -52,10 +52,8 @@ func test_my_move_waits_for_server_state() -> void:
 	t.check_eq(scene.game.board.get_stone(1, 1), Stone.EMPTY, "서버 확인 전에는 판에 반영하지 않는다")
 	t.check(not scene.can_act(), "응답 대기 중")
 
-	var server_game := GameState.new()
-	server_game.apply(GameState.place_action(1, 1))
-	net._receive({"t": "state", "state": JSON.parse_string(JSON.stringify(server_game.to_dict())), "last": GameState.place_action(1, 1), "by": Stone.BLACK})
-	t.check_eq(scene.game.board.get_stone(1, 1), Stone.BLACK, "서버 상태로 갱신")
+	net._receive(JSON.parse_string(JSON.stringify({"t": "move", "action": GameState.place_action(1, 1), "by": Stone.BLACK, "turn": 1})))
+	t.check_eq(scene.game.board.get_stone(1, 1), Stone.BLACK, "서버가 확정한 수를 적용")
 	t.check(scene.board_view.preview.is_empty())
 	t.check(not scene.can_act(), "이제 상대 차례")
 	await _cleanup(scene)
@@ -75,10 +73,13 @@ func test_server_error_unblocks_input() -> void:
 func test_win_loss_and_rematch_flow() -> void:
 	var scene: Node = await _spawn_online(Stone.WHITE)
 	var net: Node = t.root.get_node("Net")
-	var server_game := GameState.new()
-	server_game.board = BoardState.from_text("XXXX.\n.....")
-	server_game.apply(GameState.place_action(4, 0))
-	net._receive({"t": "state", "state": server_game.to_dict(), "last": GameState.place_action(4, 0), "by": Stone.BLACK})
+	# 흑이 4목을 만든 뒤 5번째 돌을 둔다.
+	var moves := [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1], [3, 0], [3, 1]]
+	for i in moves.size():
+		net._receive({"t": "move", "action": GameState.place_action(moves[i][0], moves[i][1]), "by": Stone.BLACK if i % 2 == 0 else Stone.WHITE, "turn": i + 1})
+	net._receive({"t": "move", "action": GameState.line_action(GameState.AXIS_COL, 4), "by": Stone.BLACK, "turn": 9})
+	net._receive({"t": "move", "action": GameState.line_action(GameState.AXIS_ROW, 4), "by": Stone.WHITE, "turn": 10})
+	net._receive({"t": "move", "action": GameState.place_action(4, 0), "by": Stone.BLACK, "turn": 11})
 	t.check(scene.result_panel.visible)
 	t.check_eq(scene.result_label.text, "패배")
 
@@ -88,6 +89,14 @@ func test_win_loss_and_rematch_flow() -> void:
 	t.check(not scene.result_panel.visible, "새 게임이 시작되면 결과 창이 닫힌다")
 	t.check_eq(scene.my_color, Stone.BLACK)
 	t.check(scene.can_act())
+	await _cleanup(scene)
+
+
+func test_out_of_order_move_is_desync() -> void:
+	var scene: Node = await _spawn_online(Stone.BLACK)
+	t.root.get_node("Net")._receive({"t": "move", "action": GameState.place_action(1, 1), "by": Stone.BLACK, "turn": 5})
+	t.check(scene.result_panel.visible, "순서가 어긋난 수는 동기화 오류로 처리")
+	t.check_eq(scene.game.board.get_stone(1, 1), Stone.EMPTY)
 	await _cleanup(scene)
 
 

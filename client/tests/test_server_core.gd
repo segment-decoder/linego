@@ -82,16 +82,18 @@ func test_actions_are_validated_and_broadcast() -> void:
 	out = _send(A, {"t": "action", "action": {"type": "place", "x": 1.0, "y": 2.0}})
 	for peer in [A, B]:
 		var msg: Dictionary = _to(out, peer)[0]
-		t.check_eq(msg.t, "state")
-		t.check_eq(msg.last, GameState.place_action(1, 2))
+		t.check_eq(msg.t, "move")
+		t.check_eq(msg.action, GameState.place_action(1, 2), "정규화된 수가 전달된다")
 		t.check_eq(msg.by, Stone.BLACK)
-		t.check_eq(GameState.from_dict(msg.state).board.get_stone(1, 2), Stone.BLACK)
+		t.check_eq(msg.turn, 1)
+		t.check(not msg.has("state"), "판 전체는 보내지 않는다")
 
 	out = _send(B, {"t": "action", "action": GameState.line_action(GameState.AXIS_COL, 0)})
-	var state := GameState.from_dict(_to(out, A)[0].state)
-	t.check_eq(state.board.width, 5)
-	t.check_eq(state.board.get_stone(2, 2), Stone.BLACK, "줄 긋기도 서버에서 적용된다")
-	t.check_eq(state.current_player, Stone.BLACK)
+	t.check_eq(_to(out, A)[0].turn, 2)
+	var game: GameState = core.rooms.values()[0].game
+	t.check_eq(game.board.width, 5)
+	t.check_eq(game.board.get_stone(2, 2), Stone.BLACK, "줄 긋기도 서버에서 적용된다")
+	t.check_eq(game.current_player, Stone.BLACK)
 
 
 func test_win_then_rematch_swaps_colors() -> void:
@@ -99,7 +101,8 @@ func test_win_then_rematch_swaps_colors() -> void:
 	var room: ServerCore.Room = core.rooms[code]
 	room.game.board = BoardState.from_text("XXXX.\n.....")
 	var out := _send(A, {"t": "action", "action": GameState.place_action(4, 0)})
-	t.check_eq(GameState.from_dict(_to(out, B)[0].state).winner, Stone.BLACK)
+	t.check_eq(_to(out, B)[0].t, "move")
+	t.check_eq(room.game.winner, Stone.BLACK)
 
 	out = _send(A, {"t": "action", "action": GameState.place_action(0, 1)})
 	t.check_eq(_to(out, A)[0].reason, "game_over")

@@ -62,8 +62,8 @@ func test_two_clients_play_over_websocket() -> void:
 
 	_send(a, {"t": "action", "action": GameState.place_action(2, 1)})
 	var state_b := await _receive(server, b)
-	t.check_eq(state_b.get("t"), "state")
-	t.check_eq(GameState.from_dict(state_b.state).board.get_stone(2, 1), Stone.BLACK)
+	t.check_eq(state_b.get("t"), "move")
+	t.check_eq(GameState.normalize_action(state_b.get("action")), GameState.place_action(2, 1))
 	await _receive(server, a)
 
 	# 잘못된 JSON에도 서버는 죽지 않고 오류로 답한다.

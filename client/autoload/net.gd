@@ -7,7 +7,7 @@ signal connection_failed
 signal disconnected
 signal message_received(msg: Dictionary)
 
-const PROTOCOL_VERSION := 1
+const PROTOCOL_VERSION := 2
 const DEFAULT_PORT := 8080
 const CONNECT_TIMEOUT := 5.0
 

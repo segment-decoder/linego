@@ -6,7 +6,7 @@ extends RefCounted
 ## 프로토콜: 모든 메시지는 {"t": 종류, ...} 형태의 JSON. 자세한 목록은 docs/PROTOCOL.md.
 
 const Stone := BoardState.Stone
-const PROTOCOL_VERSION := 1
+const PROTOCOL_VERSION := 2
 ## 헷갈리는 글자(0/O, 1/I/L)를 뺀 방 코드 문자
 const CODE_CHARS := "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 4
@@ -125,7 +125,8 @@ func _action(peer: int, msg: Dictionary) -> void:
 		_error(peer, reason)
 		return
 	game.apply(action)
-	var update := {"t": "state", "state": game.to_dict(), "last": action, "by": color}
+	# 판 전체 대신 둔 수만 보낸다. 클라이언트는 같은 규칙(core/)으로 적용하고 turn으로 어긋남을 확인한다.
+	var update := {"t": "move", "action": action, "by": color, "turn": game.turn_count()}
 	for p in room.players:
 		_send(p, update)
 

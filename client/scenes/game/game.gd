@@ -206,7 +206,7 @@ func _confirm_preview() -> void:
 	if board_view.preview.is_empty() or not can_act():
 		return
 	if online:
-		# 서버가 받아들이면 "state" 메시지로 돌아온다. 그때까지 미리보기를 남겨 둔다.
+		# 서버가 받아들이면 "move" 메시지로 돌아온다. 그때까지 미리보기를 남겨 둔다.
 		Net.send({"t": "action", "action": board_view.preview})
 		_waiting_server = true
 		_update_ui()
@@ -258,12 +258,8 @@ func _after_action(refit: bool = false) -> void:
 
 func _on_server_message(msg: Dictionary) -> void:
 	match msg.get("t"):
-		"state":
-			var refit := _prepare_view_for(GameState.normalize_action(msg.get("last")))
-			game = GameState.from_dict(msg.state)
-			board_view.game = game
-			_waiting_server = false
-			_after_action(refit)
+		"move":
+			_apply_server_move(msg)
 		"game_start":
 			# 다시 하기: 흑백이 바뀐 새 게임
 			my_color = int(msg.color)
@@ -276,6 +272,19 @@ func _on_server_message(msg: Dictionary) -> void:
 			_waiting_server = false
 			_update_ui()
 			hint_label.text = SERVER_ERROR_TEXT.get(msg.get("reason"), "서버 오류: %s" % msg.get("reason"))
+
+
+## 서버가 확정한 수를 같은 규칙으로 적용한다. 순서가 어긋나면(동기화 오류) 대국을 끝낸다.
+func _apply_server_move(msg: Dictionary) -> void:
+	var action := GameState.normalize_action(msg.get("action"))
+	if int(msg.get("turn", -1)) != game.turn_count() + 1 or game.validate(action) != "":
+		_show_disconnected("서버와 판 상태가 어긋났습니다.")
+		Net.close()
+		return
+	var refit := _prepare_view_for(action)
+	game.apply(action)
+	_waiting_server = false
+	_after_action(refit)
 
 
 func _on_server_disconnected() -> void:

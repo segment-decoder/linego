@@ -11,6 +11,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_server_core.gd",
 	"res://tests/test_network.gd",
 	"res://tests/test_online_scene.gd",
+	"res://tests/test_ai.gd",
 ]
 
 var failures := 0

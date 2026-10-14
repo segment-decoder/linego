@@ -11,6 +11,7 @@ client/                     Godot 프로젝트 (에디터에서 client/project.g
   core/                     규칙 로직. 노드에 의존하지 않는 순수 GDScript
     board_state.gd            판 상태, 줄 긋기(행/열 삽입), 정확히-5목 탐색
     game_state.gd             턴 진행, 행동 검증/적용, 승리 판정
+    ai.gd                     AI (공격형/방어형, 1수 앞 평가 + 전술 규칙)
   scenes/
     home/                   홈 화면 (2인 대전, 온라인 대전, 편리한 이동 설정, 규칙)
     lobby/                  온라인 로비 (서버 주소, 방 만들기 / 방 코드로 참가)
@@ -24,6 +25,7 @@ client/                     Godot 프로젝트 (에디터에서 client/project.g
     server_core.gd            방/턴/검증 로직 (소켓 없음, 테스트 가능)
     server.gd                 WebSocket 전송
     server_main.tscn          서버 실행 진입점
+  tools/                    AI 자동 대국 실험 (simulate.gd) 과 집계 (analyze_sim.py)
   tests/                    헤드리스 테스트
 docs/RULES.md               규칙 문서 (구현의 기준)
 docs/PROTOCOL.md            온라인 메시지 형식
@@ -69,6 +71,16 @@ godot --headless --path client --import                    # 최초 1회 (클래
 godot --headless --path client -s res://tests/run_tests.gd  # 실패 시 종료 코드 1
 ```
 
+## AI 자동 대국 실험
+
+```sh
+# 실험 번호 1~4 (tools/simulate.gd 상단 설명 참고), 결과는 한 판에 한 줄 JSON
+godot --headless --path client -s res://tools/simulate.gd -- --experiment=1 --games=200 --seed=1 --out=exp1.jsonl
+python3 client/tools/analyze_sim.py exp1.jsonl
+```
+
+결과 기록: [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md)
+
 ## 로드맵
 
 - [x] 규칙 코어 + 테스트
@@ -80,4 +92,5 @@ godot --headless --path client -s res://tests/run_tests.gd  # 실패 시 종료 
 - [ ] 서버 배포 (외부에서 접속 가능한 주소, wss)
 - [ ] 재접속, 턴 시간 제한
 - [ ] 랜덤 매칭, 랭킹
-- [ ] 모바일 내보내기 시 `server/`, `tests/` 제외 (export filter)
+- [ ] 모바일 내보내기 시 `server/`, `tests/`, `tools/` 제외 (export filter)
+- [ ] 컴퓨터와 대전 (core/ai.gd 사용)
