@@ -163,3 +163,33 @@ func test_placement_delta_matches_full_rescore() -> void:
 		if (delta - (after - before)).length() > 0.05:
 			mismatches += 1
 	t.check_eq(mismatches, 0)
+
+
+func test_freeze_ai_respects_frozen_cells() -> void:
+	# 백이 이길 수 있는 유일한 칸이 백에게 잠겨 있으면 그 칸에 두지 않는다.
+	_for_each_style(func(ai: LinegoAI, name: String):
+		var game := _game("OO.OO..\n.......\nX.X....", Stone.WHITE)
+		game.freeze_new_line = true
+		game.frozen_line = {"axis": GameState.AXIS_COL, "index": 2, "blocked": Stone.WHITE}
+		var action := ai.choose(game)
+		t.check(game.validate(action) == "", "%s: %s" % [name, action]))
+
+
+func test_freeze_ai_blocks_open_four_with_line() -> void:
+	# 일반 규칙에서는 막을 수 없는 열린 4목을, 잠금 규칙에서는 줄로 끊어 막는다.
+	_for_each_style(func(ai: LinegoAI, name: String):
+		var game := _game("..OOOO..\n........\nX.X.X...", Stone.BLACK)
+		game.freeze_new_line = true
+		var action := ai.choose(game)
+		t.check_eq(action.type, "line", name)
+		t.check_eq(ai.last_reason, "line_block", name)
+		game.apply(action)
+		t.check(LinegoAI.winning_cells(game.board, Stone.WHITE).filter(func(c): return not game.is_frozen_for_current(c.x, c.y)).is_empty(), name))
+
+
+func test_freeze_dead_four_split_is_an_attack() -> void:
+	# 양 끝이 막힌 흑 4목을 줄로 쪼개면 빈칸이 백에게 잠겨 흑의 강한 공격이 된다.
+	var ai := LinegoAI.new(LinegoAI.Style.AGGRESSIVE, 1)
+	var board := BoardState.from_text("OXXXXO.\n.......\n.......\n...O...")
+	var value := ai._line_attack_value(board, GameState.line_action(GameState.AXIS_COL, 3), Stone.BLACK, Stone.WHITE)
+	t.check(value >= LinegoAI.LINE_ATTACK_SCORE, "줄 공격 가치 %f" % value)

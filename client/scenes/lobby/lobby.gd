@@ -22,7 +22,12 @@ var _pending_request := {}
 
 func _ready() -> void:
 	address_edit.text = Settings.server_address
-	create_button.pressed.connect(_request.bind({"t": "create_room"}))
+	var time_option: OptionButton = %TimeOption
+	for minutes in ChessClock.ALLOWED_MINUTES:
+		time_option.add_item("%d분" % minutes, minutes)
+	time_option.select(maxi(0, ChessClock.ALLOWED_MINUTES.find(Settings.online_minutes)))
+	time_option.item_selected.connect(func(i: int): Settings.online_minutes = time_option.get_item_id(i))
+	create_button.pressed.connect(func(): _request({"t": "create_room", "minutes": Settings.online_minutes}))
 	join_button.pressed.connect(_on_join_pressed)
 	code_edit.text_submitted.connect(func(_text): _on_join_pressed())
 	%BackButton.pressed.connect(_go_home)
@@ -79,7 +84,7 @@ func _on_disconnected() -> void:
 func _on_message(msg: Dictionary) -> void:
 	match msg.get("t"):
 		"room_created":
-			status_label.text = "방 코드:  %s\n\n친구가 이 코드로 참가하면 게임이 시작됩니다." % msg.code
+			status_label.text = "방 코드:  %s   (각자 %d분)\n\n친구가 이 코드로 참가하면 게임이 시작됩니다." % [msg.code, int(msg.get("minutes", 5))]
 		"game_start":
 			get_tree().change_scene_to_file(GAME_SCENE)
 		"opponent_left":

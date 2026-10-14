@@ -8,6 +8,8 @@ extends SceneTree
 ##   3 매 판 각자 무작위 성향
 ##   4 처음 4×4 16칸을 모두 채울 때까지 돌 놓기만, 성향은 매 판 각자 무작위
 ##     (2026-10-14 이후 이 오프닝은 정식 규칙이 되어 모든 실험에 적용된다. 실험 4 = 실험 3과 같음)
+## 옵션:
+##   --freeze=1  실험 규칙 "새로 그은 줄 위에는 상대가 바로 다음 차례에 돌을 놓을 수 없다" 적용
 ## 결과는 한 판에 한 줄씩 JSON (JSON Lines).
 
 const Stone := BoardState.Stone
@@ -15,7 +17,7 @@ const OPENING_FILL_TURNS := GameState.START_SIZE * GameState.START_SIZE
 
 
 func _initialize() -> void:
-	var args := {"experiment": "1", "games": "10", "seed": "1", "out": ""}
+	var args := {"experiment": "1", "games": "10", "seed": "1", "out": "", "freeze": "0"}
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--") and arg.contains("="):
 			args[arg.substr(2, arg.find("=") - 2)] = arg.get_slice("=", 1)
@@ -27,7 +29,7 @@ func _initialize() -> void:
 
 	for i in games:
 		var styles := _styles_for(experiment, rng)
-		var record := play(experiment, styles[0], styles[1], rng.randi())
+		var record := play(experiment, styles[0], styles[1], rng.randi(), args.freeze == "1")
 		record["game"] = i
 		var line := JSON.stringify(record)
 		if out:
@@ -48,18 +50,22 @@ func _styles_for(experiment: int, rng: RandomNumberGenerator) -> Array:
 			return [rng.randi_range(0, 1), rng.randi_range(0, 1)]
 
 
-static func play(experiment: int, black_style: int, white_style: int, seed_value: int) -> Dictionary:
+static func play(experiment: int, black_style: int, white_style: int, seed_value: int, freeze := false) -> Dictionary:
 	var started := Time.get_ticks_msec()
 	var game := GameState.new()
+	game.freeze_new_line = freeze
 	var ais := {
 		Stone.BLACK: LinegoAI.new(black_style, seed_value),
 		Stone.WHITE: LinegoAI.new(white_style, seed_value + 1),
 	}
 	var stats := {
-		Stone.BLACK: {"places": 0, "lines": 0, "line_fives": 0, "cuts": 0, "blocks": 0},
-		Stone.WHITE: {"places": 0, "lines": 0, "line_fives": 0, "cuts": 0, "blocks": 0},
+		Stone.BLACK: {"places": 0, "lines": 0, "line_fives": 0, "cuts": 0, "blocks": 0, "line_blocks": 0, "line_attacks": 0},
+		Stone.WHITE: {"places": 0, "lines": 0, "line_fives": 0, "cuts": 0, "blocks": 0, "line_blocks": 0, "line_attacks": 0},
 	}
 	var first_line_turn := -1
+	var first_line_attack_by := ""
+	var line_streak := 0
+	var max_line_streak := 0
 	var win_kind := ""
 	while not game.is_over():
 		var mover := game.current_player
@@ -73,8 +79,11 @@ static func play(experiment: int, black_style: int, white_style: int, seed_value
 		var s: Dictionary = stats[mover]
 		if action.type == "place":
 			s.places += 1
+			line_streak = 0
 		else:
 			s.lines += 1
+			line_streak += 1
+			max_line_streak = maxi(max_line_streak, line_streak)
 			if first_line_turn < 0:
 				first_line_turn = game.turn_count()
 			if not had_five and game.board.has_exact_five(mover):
@@ -84,12 +93,22 @@ static func play(experiment: int, black_style: int, white_style: int, seed_value
 				s.cuts += 1
 			"block_four":
 				s.blocks += 1
+			"line_block":
+				s.blocks += 1
+				s.line_blocks += 1
+			"line_attack":
+				s.line_attacks += 1
+				if first_line_attack_by == "":
+					first_line_attack_by = "black" if mover == Stone.BLACK else "white"
 		if game.winner != Stone.EMPTY:
 			# 줄로 미리 만든 5목으로 이겼는지, 착수로 5목을 완성했는지
 			win_kind = "line_five" if ai.last_reason == "win_existing_five" else "placement"
 
 	return {
 		"experiment": experiment,
+		"freeze": freeze,
+		"first_line_attack_by": first_line_attack_by,
+		"max_line_streak": max_line_streak,
 		"black": LinegoAI.style_name(black_style),
 		"white": LinegoAI.style_name(white_style),
 		"winner": "black" if game.winner == Stone.BLACK else "white" if game.winner == Stone.WHITE else "draw",

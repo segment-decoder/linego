@@ -31,6 +31,9 @@ var online := false
 var my_color := 0
 ## 행동을 서버에 보내고 응답을 기다리는 중
 var _waiting_server := false
+## 대국 시계. null이면 시간 제한 없음 (총 수 제한으로 끝난다).
+## 온라인에서는 서버 시계를 받아 화면에만 보여 주고, 시간 초과 판정은 서버가 한다.
+var clock: ChessClock
 
 ## 현재 판 위에 있는 손가락들: index -> 화면 좌표
 var _touches := {}
@@ -51,6 +54,9 @@ var _tap_start := Vector2.ZERO
 @onready var result_label: Label = %ResultLabel
 @onready var result_info_label: Label = %ResultInfoLabel
 @onready var rematch_button: Button = %RematchButton
+@onready var clock_bar: Control = %ClockBar
+@onready var black_clock_label: Label = %BlackClockLabel
+@onready var white_clock_label: Label = %WhiteClockLabel
 
 
 func _ready() -> void:
@@ -80,9 +86,44 @@ func _ready() -> void:
 		Net.message_received.connect(_on_server_message)
 		Net.disconnected.connect(_on_server_disconnected)
 		my_color = Net.my_color
+		_sync_clock(Net.start_clock)
 		start_game(GameState.from_dict(Net.start_state))
 	else:
-		start_game(GameState.new())
+		start_game(_new_local_game())
+
+
+## 한 기기 대전 새 게임. 시간 제한을 켜 두었으면 각자 5분, 수 제한 없음.
+func _new_local_game() -> GameState:
+	var new_game := GameState.new()
+	clock = null
+	if Settings.local_clock:
+		new_game.max_turns = 0
+		clock = ChessClock.new(ChessClock.DEFAULT_MINUTES)
+		clock.start(Stone.BLACK, Time.get_ticks_msec())
+	return new_game
+
+
+func _sync_clock(data: Dictionary) -> void:
+	clock = ChessClock.from_dict(data, Time.get_ticks_msec()) if not data.is_empty() else null
+
+
+func _process(_delta: float) -> void:
+	if clock == null:
+		clock_bar.hide()
+		return
+	clock_bar.show()
+	var now := Time.get_ticks_msec()
+	black_clock_label.text = "● 흑  " + ChessClock.format(clock.remaining(Stone.BLACK, now))
+	white_clock_label.text = "○ 백  " + ChessClock.format(clock.remaining(Stone.WHITE, now))
+	black_clock_label.modulate.a = 1.0 if clock.running == Stone.BLACK else 0.45
+	white_clock_label.modulate.a = 1.0 if clock.running == Stone.WHITE else 0.45
+	# 온라인은 서버가 시간 초과를 알려 준다. 한 기기 대전은 여기서 판정한다.
+	if not online and not game.is_over():
+		var loser := clock.flagged(now)
+		if loser != 0:
+			game.timeout(loser)
+			clock.stop(now)
+			_show_result()
 
 
 func start_game(new_game: GameState) -> void:
@@ -221,6 +262,8 @@ func apply_action(action: Dictionary) -> bool:
 		return false
 	var refit := _prepare_view_for(action)
 	game.apply(action)
+	if clock:
+		clock.switch_to(0 if game.is_over() else game.current_player, Time.get_ticks_msec())
 	_after_action(refit)
 	return true
 
@@ -264,7 +307,12 @@ func _on_server_message(msg: Dictionary) -> void:
 		"game_start":
 			# 다시 하기: 흑백이 바뀐 새 게임
 			my_color = int(msg.color)
+			_sync_clock(msg.get("clock", {}))
 			start_game(GameState.from_dict(msg.state))
+		"timeout":
+			_sync_clock(msg.get("clock", {}))
+			game.timeout(int(msg.loser))
+			_show_result()
 		"rematch_requested":
 			result_info_label.text = "상대가 한 판 더 원합니다. [다시 하기]를 누르면 시작합니다."
 		"opponent_left":
@@ -284,6 +332,7 @@ func _apply_server_move(msg: Dictionary) -> void:
 		return
 	var refit := _prepare_view_for(action)
 	game.apply(action)
+	_sync_clock(msg.get("clock", {}))
 	_waiting_server = false
 	_after_action(refit)
 
@@ -308,7 +357,7 @@ func _on_rematch_pressed() -> void:
 		rematch_button.disabled = true
 		result_info_label.text = "상대를 기다리는 중..."
 	else:
-		start_game(GameState.new())
+		start_game(_new_local_game())
 
 
 ## 줄을 그으면 그 뒤쪽 돌들이 한 칸씩 밀린다. 보고 있던 곳이 밀린 쪽이면 카메라도 같이 옮겨
@@ -358,7 +407,7 @@ func _update_ui() -> void:
 		var whose := "내" if game.current_player == my_color else "상대"
 		turn_text = "%s 차례 (%s)" % [whose, stone_name(game.current_player)]
 	turn_label.text = "%s  ·  판 %d×%d" % [turn_text, board.width, board.height]
-	if game.turns_left() <= SHOW_TURNS_LEFT_BELOW:
+	if game.turns_left() >= 0 and game.turns_left() <= SHOW_TURNS_LEFT_BELOW:
 		turn_label.text += "  ·  남은 수 %d" % game.turns_left()
 
 	var my_turn := can_act()
@@ -401,6 +450,8 @@ func _show_result() -> void:
 	else:
 		result_label.text = "%s 승리!" % stone_name(game.winner)
 		result_info_label.text = ""
+	if game.end_reason == "timeout":
+		result_info_label.text = ("%s 시간 초과. " % stone_name(GameState.opponent(game.winner))) + result_info_label.text
 	rematch_button.disabled = false
 	turn_label.text = "게임 종료"
 	confirm_button.disabled = true

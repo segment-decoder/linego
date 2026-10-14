@@ -13,7 +13,8 @@ const RULES_TEXT := """목표: 가로·세로·대각선으로 내 돌을 정확
 
 승리는 돌을 놓은 직후에만 판정합니다. 줄을 그어 5목이 생겨도 그 턴에는 이기지 않고, 다음 내 턴에 5목을 망가뜨리지 않는 곳에 돌을 놓으면 승리합니다.
 
-두 사람의 수(돌 놓기 + 줄 긋기)를 합쳐 %d수가 되면 무승부입니다.
+시간: 각자 5분(온라인은 방을 만들 때 3/5/10분 선택). 자기 차례에만 시간이 줄고, 다 쓰면 집니다. 수 제한은 없습니다.
+한 기기 대전에서 시간 제한을 끄면, 두 사람의 수를 합쳐 %d수가 되면 무승부입니다.
 
 판 이동: 두 손가락으로 확대·축소·이동할 수 있습니다."""
 
@@ -26,6 +27,8 @@ func _ready() -> void:
 	%OnlineGameButton.pressed.connect(get_tree().change_scene_to_file.bind(LOBBY_SCENE))
 	%RulesButton.pressed.connect(rules_dialog.popup_centered)
 	%QuitButton.pressed.connect(get_tree().quit)
+	%LocalClockCheck.button_pressed = Settings.local_clock
+	%LocalClockCheck.toggled.connect(func(on: bool): Settings.local_clock = on)
 	easy_nav_check.button_pressed = Settings.easy_navigation
 	easy_nav_check.toggled.connect(func(on: bool): Settings.easy_navigation = on)
 	rules_dialog.dialog_text = RULES_TEXT % GameState.MAX_TURNS

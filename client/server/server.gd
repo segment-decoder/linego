@@ -59,6 +59,7 @@ func poll() -> void:
 				_peers.erase(id)
 				_connected_at.erase(id)
 				core.handle_disconnect(id)
+	core.tick()
 	_flush()
 
 

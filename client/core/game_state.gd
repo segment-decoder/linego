@@ -24,11 +24,19 @@ var current_player: int = Stone.BLACK
 var winner: int = Stone.EMPTY
 ## 총 수 제한에 도달해 무승부로 끝났는지
 var draw := false
+## 끝난 이유: "" 진행 중, "five" 5목, "turn_limit" 총 수 제한 무승부, "timeout" 시간 초과
+var end_reason := ""
 ## 승리를 만든 5목 (Array[Vector2i])
 var winning_line: Array = []
 ## 적용된 행동 목록 (리플레이/네트워크 동기화용)
 var history: Array[Dictionary] = []
+## 총 수 제한. 0이면 제한 없음 (시간 제한이 있는 대국은 시계가 끝을 정한다)
 var max_turns := MAX_TURNS
+
+## [실험 규칙] 새로 그은 줄 위에는 그 줄을 그은 사람의 상대가 바로 다음 차례에 돌을 놓을 수 없다.
+var freeze_new_line := false
+## 지금 잠긴 줄: {"axis", "index", "blocked": 놓을 수 없는 색}. 없으면 빈 Dictionary.
+var frozen_line := {}
 
 
 func _init(w: int = START_SIZE, h: int = START_SIZE) -> void:
@@ -49,8 +57,25 @@ func turn_count() -> int:
 	return history.size()
 
 
+## 총 수 제한까지 남은 수. 제한이 없으면 -1.
 func turns_left() -> int:
-	return max_turns - history.size()
+	return max_turns - history.size() if max_turns > 0 else -1
+
+
+## (x, y)가 지금 current_player에게 잠긴 줄 위에 있는가
+func is_frozen_for_current(x: int, y: int) -> bool:
+	if frozen_line.is_empty() or frozen_line.blocked != current_player:
+		return false
+	return x == frozen_line.index if frozen_line.axis == AXIS_COL else y == frozen_line.index
+
+
+## 시간 초과로 loser가 진다.
+func timeout(loser: int) -> void:
+	if is_over():
+		return
+	winner = opponent(loser)
+	end_reason = "timeout"
+	changed.emit()
 
 
 static func opponent(stone: int) -> int:
@@ -96,6 +121,8 @@ func validate(action: Variant) -> String:
 			return "out_of_board"
 		if not board.is_empty(a.x, a.y):
 			return "occupied"
+		if is_frozen_for_current(a.x, a.y):
+			return "frozen"
 		return ""
 	if in_opening():
 		return "opening"
@@ -118,6 +145,7 @@ func apply(action: Variant) -> bool:
 		if not lines.is_empty():
 			winner = mover
 			winning_line = lines[0]
+			end_reason = "five"
 	else:
 		if a.axis == AXIS_COL:
 			board.insert_column(a.index)
@@ -125,9 +153,15 @@ func apply(action: Variant) -> bool:
 			board.insert_row(a.index)
 		# 줄긋기로 5목이 생겨도 이 턴에는 승리하지 않는다.
 	history.append(a)
+	# 잠긴 줄은 막힌 쪽이 한 수를 두면 풀린다. 새로 그은 줄은 상대에게 잠긴다.
+	if not frozen_line.is_empty() and frozen_line.blocked == mover:
+		frozen_line = {}
+	if freeze_new_line and a.type == "line":
+		frozen_line = {"axis": a.axis, "index": a.index, "blocked": opponent(mover)}
 	# 마지막 수로 승리하면 승리가 우선한다.
-	if winner == Stone.EMPTY and history.size() >= max_turns:
+	if winner == Stone.EMPTY and max_turns > 0 and history.size() >= max_turns:
 		draw = true
+		end_reason = "turn_limit"
 	if not is_over():
 		current_player = opponent(mover)
 	changed.emit()
@@ -143,6 +177,9 @@ func to_dict() -> Dictionary:
 		"winning_line": winning_line.map(func(p: Vector2i): return [p.x, p.y]),
 		"history": history.duplicate(true),
 		"max_turns": max_turns,
+		"end_reason": end_reason,
+		"freeze_new_line": freeze_new_line,
+		"frozen_line": frozen_line.duplicate(),
 	}
 
 
@@ -153,6 +190,11 @@ static func from_dict(data: Dictionary) -> GameState:
 	game.winner = int(data.winner)
 	game.draw = bool(data.get("draw", false))
 	game.max_turns = int(data.get("max_turns", MAX_TURNS))
+	game.end_reason = str(data.get("end_reason", ""))
+	game.freeze_new_line = bool(data.get("freeze_new_line", false))
+	var frozen: Dictionary = data.get("frozen_line", {})
+	if not frozen.is_empty():
+		game.frozen_line = {"axis": str(frozen.axis), "index": int(frozen.index), "blocked": int(frozen.blocked)}
 	for p in data.get("winning_line", []):
 		game.winning_line.append(Vector2i(int(p[0]), int(p[1])))
 	for action in data.get("history", []):

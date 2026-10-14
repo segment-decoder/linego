@@ -53,6 +53,22 @@ layout_mode = 2
 placeholder_text = "예: 192.168.0.10:8080"
 virtual_keyboard_type = 7
 
+[node name="TimeRow" type="HBoxContainer" parent="Center/Menu"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TimeLabel" type="Label" parent="Center/Menu/TimeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.23, 0.16, 0.08, 1)
+theme_override_font_sizes/font_size = 36
+text = "방 만들 때 각자 시간"
+
+[node name="TimeOption" type="OptionButton" parent="Center/Menu/TimeRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 100)
+layout_mode = 2
+
 [node name="Gap" type="Control" parent="Center/Menu"]
 custom_minimum_size = Vector2(0, 24)
 layout_mode = 2

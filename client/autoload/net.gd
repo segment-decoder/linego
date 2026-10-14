@@ -7,7 +7,7 @@ signal connection_failed
 signal disconnected
 signal message_received(msg: Dictionary)
 
-const PROTOCOL_VERSION := 2
+const PROTOCOL_VERSION := 3
 const DEFAULT_PORT := 8080
 const CONNECT_TIMEOUT := 5.0
 
@@ -19,6 +19,7 @@ var _connect_started := 0.0
 var room_code := ""
 var my_color := 0
 var start_state := {}
+var start_clock := {}
 
 
 func is_open() -> bool:
@@ -111,6 +112,7 @@ func _receive(msg: Dictionary) -> void:
 		room_code = str(msg.code)
 		my_color = int(msg.color)
 		start_state = msg.state
+		start_clock = msg.get("clock", {})
 	elif msg.get("t") == "opponent_left":
 		my_color = 0
 	message_received.emit(msg)
@@ -120,3 +122,4 @@ func _clear_session() -> void:
 	room_code = ""
 	my_color = 0
 	start_state = {}
+	start_clock = {}

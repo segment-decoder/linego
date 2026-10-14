@@ -57,6 +57,13 @@ custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
 text = "2인 대전 (한 기기)"
 
+[node name="LocalClockCheck" type="CheckButton" parent="Center/Menu"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "한 기기 대전 시간 제한 (각자 5분)"
+
 [node name="OnlineGameButton" type="Button" parent="Center/Menu"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 140)

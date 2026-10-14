@@ -23,6 +23,8 @@ const FIVE_SCORE := 100000.0
 ## 상대가 줄 하나로 끊을 수 있는 5목의 가치. 상대는 반드시 줄로 끊어야 하므로(돌을 얻지 못함)
 ## 착수로 막아야 하는 4목(500)보다 조금 높게 본다.
 const CUTTABLE_FIVE_SCORE := 800.0
+## 잠금 규칙에서 상대가 줄로 되받아야 하는 줄 공격의 가치 (4목 500, 끊을 수 있는 5목 800보다 높게)
+const LINE_ATTACK_SCORE := 900.0
 const OUTSIDE_FACTOR := 0.6
 ## 착수 후보: 기존 돌에서 이 거리(체비셰프) 이내의 빈칸
 const NEAR := 2
@@ -76,10 +78,14 @@ func choose(game: GameState) -> Dictionary:
 	var me := game.current_player
 	var op := GameState.opponent(me)
 	var lines_allowed := not place_only and not game.in_opening()
+	var freeze := game.freeze_new_line
+	var legal := func(cell: Vector2i) -> bool: return not game.is_frozen_for_current(cell.x, cell.y)
 
 	# 1. 판에 이미 내 5목 → 망가뜨리지 않는 착수로 승리
 	if board.has_exact_five(me):
 		for cell in _empty_cells(board):
+			if not legal.call(cell):
+				continue
 			var copy := board.duplicate_state()
 			copy.set_stone(cell.x, cell.y, me)
 			if copy.has_exact_five(me):
@@ -87,7 +93,7 @@ func choose(game: GameState) -> Dictionary:
 				return GameState.place_action(cell.x, cell.y)
 
 	# 2. 착수로 5목
-	var wins := winning_cells(board, me)
+	var wins := winning_cells(board, me).filter(legal)
 	if not wins.is_empty():
 		last_reason = "win_place"
 		return GameState.place_action(wins[0].x, wins[0].y)
@@ -106,28 +112,76 @@ func choose(game: GameState) -> Dictionary:
 	# 4. 상대의 착수 승리 지점 막기
 	var threats := winning_cells(board, op)
 	if not threats.is_empty():
-		for cell in threats:
+		for cell in threats.filter(legal):
 			candidates.append(GameState.place_action(cell.x, cell.y))
-		# 줄은 돌 사이를 벌리기만 해서 4목을 막지 못한다(끊으면 빈칸이 새 승리 지점이 됨).
-		# 착수로 다 막을 수 없을 때(승리 지점 2곳 이상)만 줄 후보도 본다.
-		if lines_allowed and threats.size() >= 2:
+		# 기본 규칙에서 줄은 4목을 막지 못한다(끊으면 빈칸이 새 승리 지점이 됨). 그래서 착수로 다 막을 수
+		# 없을 때만 줄을 본다. 잠금 규칙에서는 끊은 빈칸이 상대에게 잠기므로 줄도 수비 수단이 된다.
+		if lines_allowed and (freeze or threats.size() >= 2 or candidates.is_empty()):
+			var line_defenses: Array[Dictionary] = []
 			for action in _line_candidates(board):
-				if winning_cells(_after(board, action), op).is_empty():
-					candidates.append(action)
-		last_reason = "block_four"
-		return _best(board, me, candidates)
+				if not _opponent_wins_after_line(board, action, op, freeze):
+					line_defenses.append(action)
+			# 승리 지점이 2곳 이상이면 돌 하나로는 다 막지 못하므로, 실제로 다 막는 줄만 남긴다.
+			if threats.size() >= 2 and not line_defenses.is_empty():
+				candidates.clear()
+			candidates.append_array(line_defenses)
+		if not candidates.is_empty():
+			last_reason = "block_four"
+			var chosen := _best(board, me, candidates)
+			if chosen.type == "line":
+				last_reason = "line_block"
+			return chosen
 
 	# 5. 평가 점수
 	for cell in _placement_candidates(board):
-		candidates.append(GameState.place_action(cell.x, cell.y))
+		if legal.call(cell):
+			candidates.append(GameState.place_action(cell.x, cell.y))
+	var bonuses := {}
 	if lines_allowed:
 		for action in _line_candidates(board):
-			if not _gives_immediate_win(board, action, op):
-				candidates.append(action)
+			if _gives_immediate_win(board, action, op, freeze):
+				continue
+			candidates.append(action)
+			# 잠금 규칙: 새 줄 위에 내 승리 지점이 생기면 상대는 그 칸을 막을 수 없다(줄로 되받아야 함).
+			if freeze:
+				var bonus := _line_attack_value(board, action, me, op)
+				if bonus > 0.0:
+					bonuses[str(action)] = bonus
 	if candidates.is_empty():
 		candidates = _all_line_actions(board)
 	last_reason = "heuristic"
-	return _best(board, me, candidates)
+	var chosen := _best(board, me, candidates, bonuses)
+	if bonuses.has(str(chosen)):
+		last_reason = "line_attack"
+	return chosen
+
+
+## 잠금 규칙에서, 이 줄로 새 줄 위에 내 승리 지점이 생기면 그 가치.
+## 상대가 줄 하나로 되받아 모두 없앨 수 없으면 사실상 승리(FIVE_SCORE), 되받을 수 있으면 강제수 정도.
+func _line_attack_value(board: BoardState, action: Dictionary, me: int, op: int) -> float:
+	var after := _after(board, action)
+	var on_line := _cells_on_line(winning_cells(after, me, _band_around(after, action)), action)
+	if on_line.is_empty():
+		return 0.0
+	for counter in _all_line_actions(after):
+		var after2 := _after(after, counter)
+		# 상대가 되받은 줄은 이번엔 나에게 잠긴다.
+		var my_wins := winning_cells(after2, me)
+		if _cells_off_line(my_wins, counter).is_empty() and not after2.has_exact_five(me):
+			return LINE_ATTACK_SCORE
+	return FIVE_SCORE
+
+
+static func _on_line(cell: Vector2i, action: Dictionary) -> bool:
+	return cell.x == action.index if action.axis == GameState.AXIS_COL else cell.y == action.index
+
+
+static func _cells_on_line(cells: Array[Vector2i], action: Dictionary) -> Array[Vector2i]:
+	return cells.filter(func(c: Vector2i): return _on_line(c, action))
+
+
+static func _cells_off_line(cells: Array[Vector2i], action: Dictionary) -> Array[Vector2i]:
+	return cells.filter(func(c: Vector2i): return not _on_line(c, action))
 
 
 ## color가 착수 한 번으로 정확한 5목을 만들 수 있는 빈칸들. region을 주면 그 안의 돌 주변만 본다.
@@ -257,10 +311,16 @@ static func _any(flags: PackedByteArray, from: int, to: int) -> bool:
 
 ## 이 줄을 그으면 상대(op)가 다음 착수로 바로 이길 수 있게 되는가.
 ## 줄 전에는 상대 승리 지점/5목이 없다는 전제(choose의 5단계)에서, 바뀔 수 있는 새 줄 주변 띠만 확인한다.
-static func _gives_immediate_win(board: BoardState, action: Dictionary, op: int) -> bool:
+## freeze(잠금 규칙)이면 새 줄 위의 칸은 상대가 다음 차례에 놓을 수 없으므로 승리 지점에서 뺀다.
+static func _gives_immediate_win(board: BoardState, action: Dictionary, op: int, freeze := false) -> bool:
 	var after := _after(board, action)
 	var band := _band_around(after, action)
-	return _has_five_in(after, op, band) or not winning_cells(after, op, band).is_empty()
+	if _has_five_in(after, op, band):
+		return true
+	var wins := winning_cells(after, op, band)
+	if freeze:
+		wins = _cells_off_line(wins, action)
+	return not wins.is_empty()
 
 
 ## 새 줄에서 앞뒤 6칸 띠 (줄 긋기로 달라질 수 있는 연결은 모두 이 안에 걸친다)
@@ -297,6 +357,17 @@ static func _has_five_in(board: BoardState, color: int, region: Rect2i) -> bool:
 	return false
 
 
+## 이 줄을 그은 뒤에도 상대가 다음 차례에 이길 수 있는가 (판 전체 확인 — 이미 위협이 있을 때 사용)
+static func _opponent_wins_after_line(board: BoardState, action: Dictionary, op: int, freeze: bool) -> bool:
+	var after := _after(board, action)
+	if after.has_exact_five(op):
+		return true
+	var wins := winning_cells(after, op)
+	if freeze:
+		wins = _cells_off_line(wins, action)
+	return not wins.is_empty()
+
+
 ## 줄 긋기를 적용한 판 복사본
 static func _after(board: BoardState, action: Dictionary) -> BoardState:
 	var copy := board.duplicate_state()
@@ -309,7 +380,7 @@ static func _after(board: BoardState, action: Dictionary) -> BoardState:
 
 # --- 평가 --------------------------------------------------------------------
 
-func _best(board: BoardState, me: int, candidates: Array[Dictionary]) -> Dictionary:
+func _best(board: BoardState, me: int, candidates: Array[Dictionary], bonuses := {}) -> Dictionary:
 	var op := GameState.opponent(me)
 	_load(board)
 	var best: Dictionary = candidates[0]
@@ -328,7 +399,7 @@ func _best(board: BoardState, me: int, candidates: Array[Dictionary]) -> Diction
 			# 줄로 내 5목이 새로 생겼는데 상대가 줄 하나로 끊을 수 있으면 가치를 낮춘다.
 			if d_me > FIVE_SCORE / 2.0 and _opponent_can_cut(board, action, me):
 				d_me -= FIVE_SCORE - CUTTABLE_FIVE_SCORE
-		var value := attack_weight * d_me - defense_weight * d_op + rng.randf() * NOISE
+		var value: float = attack_weight * (d_me + bonuses.get(str(action), 0.0)) - defense_weight * d_op + rng.randf() * NOISE
 		if value > best_value:
 			best_value = value
 			best = action

@@ -180,3 +180,55 @@ func test_from_dict_restores_everything() -> void:
 	t.check_eq(copy.history, game.history)
 	t.check_eq(copy.current_player, game.current_player)
 	t.check(copy.is_over())
+
+
+func test_freeze_rule_blocks_opponent_for_one_turn() -> void:
+	var game := _after_opening()
+	game.freeze_new_line = true
+	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 2)), "흑 17수째 줄")
+	t.check_eq(game.validate(GameState.place_action(2, 0)), "frozen", "백은 새 줄 위에 바로 놓을 수 없다")
+	t.check(game.apply(GameState.line_action(GameState.AXIS_ROW, 4)), "백은 줄을 그을 수 있다")
+	# 흑 차례: 흑의 줄(열 2)은 풀렸고, 백이 그은 줄(행 4)은 흑에게 잠겼다.
+	t.check_eq(game.validate(GameState.place_action(2, 0)), "", "줄을 그은 쪽은 자기 다음 차례에 놓을 수 있다")
+	t.check_eq(game.validate(GameState.place_action(0, 4)), "frozen")
+	t.check(game.apply(GameState.place_action(2, 0)))
+	t.check(game.frozen_line.is_empty(), "막힌 쪽이 한 수 두면 풀린다")
+	t.check_eq(game.validate(GameState.place_action(0, 4)), "", "백 차례에는 행 4가 열려 있다")
+
+
+func test_freeze_cut_makes_line_a_defense() -> void:
+	# 백의 열린 4목을 흑이 줄로 끊으면, 빈칸이 백에게 잠겨 백이 바로 이길 수 없다.
+	var game := _game_with(".OOOO..\n.......\nXX.X...")
+	game.freeze_new_line = true
+	game.apply(GameState.line_action(GameState.AXIS_COL, 3))
+	t.check_eq(game.board.to_text().split("\n")[0], ".OO.OO..")
+	t.check_eq(game.validate(GameState.place_action(3, 0)), "frozen")
+	t.check(game.apply(GameState.place_action(0, 0)), "백은 다른 곳에 둔다")
+	t.check_eq(game.winner, Stone.EMPTY, "양 끝에 두어도 5목이 아니다")
+
+
+func test_freeze_off_by_default() -> void:
+	var game := _after_opening()
+	game.apply(GameState.line_action(GameState.AXIS_COL, 2))
+	t.check_eq(game.validate(GameState.place_action(2, 0)), "")
+
+
+func test_freeze_state_survives_json() -> void:
+	var game := _after_opening()
+	game.freeze_new_line = true
+	game.apply(GameState.line_action(GameState.AXIS_COL, 1))
+	var copy := GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict())))
+	t.check(copy.freeze_new_line)
+	t.check_eq(copy.validate(GameState.place_action(1, 0)), "frozen")
+
+
+func test_timeout_loses_and_unlimited_turns() -> void:
+	var game := GameState.new()
+	game.max_turns = 0
+	t.check_eq(game.turns_left(), -1, "제한 없음")
+	game.apply(GameState.place_action(0, 0))
+	game.timeout(Stone.WHITE)
+	t.check_eq(game.winner, Stone.BLACK)
+	t.check_eq(game.end_reason, "timeout")
+	t.check(game.is_over())
+	t.check_eq(game.validate(GameState.place_action(1, 1)), "game_over")
