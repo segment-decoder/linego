@@ -39,6 +39,12 @@ func is_over() -> bool:
 	return winner != Stone.EMPTY or draw
 
 
+## 오프닝: 처음 4×4 판을 돌로 모두 채울 때까지는 돌 놓기만 할 수 있다.
+## (오프닝 동안은 줄을 그을 수 없으므로 판은 4×4 그대로이고, 16수를 두면 꽉 찬다)
+func in_opening() -> bool:
+	return board.width == START_SIZE and board.height == START_SIZE and not board.is_full()
+
+
 func turn_count() -> int:
 	return history.size()
 
@@ -91,6 +97,8 @@ func validate(action: Variant) -> String:
 		if not board.is_empty(a.x, a.y):
 			return "occupied"
 		return ""
+	if in_opening():
+		return "opening"
 	var limit := board.width if a.axis == AXIS_COL else board.height
 	return "" if a.index >= 0 and a.index <= limit else "bad_index"
 

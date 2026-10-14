@@ -73,13 +73,15 @@ func test_server_error_unblocks_input() -> void:
 func test_win_loss_and_rematch_flow() -> void:
 	var scene: Node = await _spawn_online(Stone.WHITE)
 	var net: Node = t.root.get_node("Net")
-	# 흑이 4목을 만든 뒤 5번째 돌을 둔다.
-	var moves := [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1], [3, 0], [3, 1]]
+	# 오프닝 16수(흑이 맨 윗줄 4개), 흑이 오른쪽 바깥에 세로줄, 백 가로줄, 흑이 5번째 돌.
+	var moves := [[0, 0], [0, 1], [1, 0], [1, 1], [2, 0], [2, 1], [3, 0], [3, 1],
+		[0, 2], [0, 3], [1, 2], [1, 3], [2, 3], [2, 2], [3, 3], [3, 2]]
 	for i in moves.size():
 		net._receive({"t": "move", "action": GameState.place_action(moves[i][0], moves[i][1]), "by": Stone.BLACK if i % 2 == 0 else Stone.WHITE, "turn": i + 1})
-	net._receive({"t": "move", "action": GameState.line_action(GameState.AXIS_COL, 4), "by": Stone.BLACK, "turn": 9})
-	net._receive({"t": "move", "action": GameState.line_action(GameState.AXIS_ROW, 4), "by": Stone.WHITE, "turn": 10})
-	net._receive({"t": "move", "action": GameState.place_action(4, 0), "by": Stone.BLACK, "turn": 11})
+	t.check(not scene.result_panel.visible, "오프닝에서는 5목이 나오지 않는다")
+	net._receive({"t": "move", "action": GameState.line_action(GameState.AXIS_COL, 4), "by": Stone.BLACK, "turn": 17})
+	net._receive({"t": "move", "action": GameState.line_action(GameState.AXIS_ROW, 4), "by": Stone.WHITE, "turn": 18})
+	net._receive({"t": "move", "action": GameState.place_action(4, 0), "by": Stone.BLACK, "turn": 19})
 	t.check(scene.result_panel.visible)
 	t.check_eq(scene.result_label.text, "패배")
 

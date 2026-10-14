@@ -75,6 +75,7 @@ func choose(game: GameState) -> Dictionary:
 	var board := game.board
 	var me := game.current_player
 	var op := GameState.opponent(me)
+	var lines_allowed := not place_only and not game.in_opening()
 
 	# 1. 판에 이미 내 5목 → 망가뜨리지 않는 착수로 승리
 	if board.has_exact_five(me):
@@ -94,7 +95,7 @@ func choose(game: GameState) -> Dictionary:
 	var candidates: Array[Dictionary] = []
 
 	# 3. 판에 상대 5목 → 끊는 줄
-	if not place_only and board.has_exact_five(op):
+	if lines_allowed and board.has_exact_five(op):
 		for action in _all_line_actions(board):
 			if not _after(board, action).has_exact_five(op):
 				candidates.append(action)
@@ -109,7 +110,7 @@ func choose(game: GameState) -> Dictionary:
 			candidates.append(GameState.place_action(cell.x, cell.y))
 		# 줄은 돌 사이를 벌리기만 해서 4목을 막지 못한다(끊으면 빈칸이 새 승리 지점이 됨).
 		# 착수로 다 막을 수 없을 때(승리 지점 2곳 이상)만 줄 후보도 본다.
-		if not place_only and threats.size() >= 2:
+		if lines_allowed and threats.size() >= 2:
 			for action in _line_candidates(board):
 				if winning_cells(_after(board, action), op).is_empty():
 					candidates.append(action)
@@ -119,7 +120,7 @@ func choose(game: GameState) -> Dictionary:
 	# 5. 평가 점수
 	for cell in _placement_candidates(board):
 		candidates.append(GameState.place_action(cell.x, cell.y))
-	if not place_only:
+	if lines_allowed:
 		for action in _line_candidates(board):
 			if not _gives_immediate_win(board, action, op):
 				candidates.append(action)

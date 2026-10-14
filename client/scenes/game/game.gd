@@ -20,6 +20,7 @@ const SERVER_ERROR_TEXT := {
 	"not_your_turn": "상대 차례입니다.",
 	"occupied": "이미 돌이 있는 곳입니다.",
 	"game_over": "이미 끝난 게임입니다.",
+	"opening": "4×4 판을 다 채울 때까지는 돌만 놓을 수 있습니다.",
 }
 
 var game: GameState
@@ -362,8 +363,9 @@ func _update_ui() -> void:
 
 	var my_turn := can_act()
 	confirm_button.disabled = board_view.preview.is_empty() or not my_turn
-	for button in [place_button, col_button, row_button]:
-		button.disabled = not my_turn
+	place_button.disabled = not my_turn
+	for button in [col_button, row_button]:
+		button.disabled = not my_turn or game.in_opening()
 
 	var hint := ""
 	match mode:
@@ -375,6 +377,8 @@ func _update_ui() -> void:
 			hint = "가로줄을 그을 위치(줄 사이 또는 바깥)를 누르세요."
 	if not board_view.preview.is_empty():
 		hint = "같은 곳을 한 번 더 누르거나 [확정]을 누르세요."
+	if game.in_opening() and my_turn:
+		hint = "오프닝: 4×4 판을 다 채울 때까지는 돌만 놓습니다. (%d칸 남음)\n" % (GameState.START_SIZE * GameState.START_SIZE - game.turn_count()) + hint
 	if online and not my_turn and not game.is_over():
 		hint = "서버 응답을 기다리는 중..." if _waiting_server else "상대가 두는 중입니다..."
 
