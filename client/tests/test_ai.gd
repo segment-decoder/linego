@@ -37,6 +37,7 @@ func test_does_not_make_six() -> void:
 func test_blocks_opponent_four() -> void:
 	_for_each_style(func(ai: LinegoAI, name: String):
 		var game := _game(".OOOO...\n........\nX.X.....", Stone.BLACK)
+		game.freeze_new_line = false  # 잠금 규칙에서는 줄로 막을 수도 있다 (별도 테스트)
 		var action := ai.choose(game)
 		t.check_eq(ai.last_reason, "block_four", name)
 		t.check(action == GameState.place_action(0, 0) or action == GameState.place_action(5, 0), "%s: %s" % [name, action]))

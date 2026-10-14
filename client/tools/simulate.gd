@@ -9,7 +9,8 @@ extends SceneTree
 ##   4 처음 4×4 16칸을 모두 채울 때까지 돌 놓기만, 성향은 매 판 각자 무작위
 ##     (2026-10-14 이후 이 오프닝은 정식 규칙이 되어 모든 실험에 적용된다. 실험 4 = 실험 3과 같음)
 ## 옵션:
-##   --freeze=1  실험 규칙 "새로 그은 줄 위에는 상대가 바로 다음 차례에 돌을 놓을 수 없다" 적용
+##   --freeze=0|1   새 줄 잠금 규칙 (기본 1 = 정식 규칙)
+##   --opening=0|1  오프닝 규칙 (기본 1 = 정식 규칙)
 ## 결과는 한 판에 한 줄씩 JSON (JSON Lines).
 
 const Stone := BoardState.Stone
@@ -17,7 +18,7 @@ const OPENING_FILL_TURNS := GameState.START_SIZE * GameState.START_SIZE
 
 
 func _initialize() -> void:
-	var args := {"experiment": "1", "games": "10", "seed": "1", "out": "", "freeze": "0"}
+	var args := {"experiment": "1", "games": "10", "seed": "1", "out": "", "freeze": "1", "opening": "1"}
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--") and arg.contains("="):
 			args[arg.substr(2, arg.find("=") - 2)] = arg.get_slice("=", 1)
@@ -29,7 +30,7 @@ func _initialize() -> void:
 
 	for i in games:
 		var styles := _styles_for(experiment, rng)
-		var record := play(experiment, styles[0], styles[1], rng.randi(), args.freeze == "1")
+		var record := play(experiment, styles[0], styles[1], rng.randi(), args.freeze == "1", args.opening == "1")
 		record["game"] = i
 		var line := JSON.stringify(record)
 		if out:
@@ -50,10 +51,11 @@ func _styles_for(experiment: int, rng: RandomNumberGenerator) -> Array:
 			return [rng.randi_range(0, 1), rng.randi_range(0, 1)]
 
 
-static func play(experiment: int, black_style: int, white_style: int, seed_value: int, freeze := false) -> Dictionary:
+static func play(experiment: int, black_style: int, white_style: int, seed_value: int, freeze := true, opening := true) -> Dictionary:
 	var started := Time.get_ticks_msec()
 	var game := GameState.new()
 	game.freeze_new_line = freeze
+	game.opening_rule = opening
 	var ais := {
 		Stone.BLACK: LinegoAI.new(black_style, seed_value),
 		Stone.WHITE: LinegoAI.new(white_style, seed_value + 1),
@@ -107,6 +109,7 @@ static func play(experiment: int, black_style: int, white_style: int, seed_value
 	return {
 		"experiment": experiment,
 		"freeze": freeze,
+		"opening": opening,
 		"first_line_attack_by": first_line_attack_by,
 		"max_line_streak": max_line_streak,
 		"black": LinegoAI.style_name(black_style),

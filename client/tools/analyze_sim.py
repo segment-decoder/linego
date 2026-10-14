@@ -91,11 +91,12 @@ def main(paths):
             for line in f:
                 if line.strip():
                     r = json.loads(line)
-                    rows_by_exp[(r.get("freeze", False), r["experiment"])].append(r)
+                    rows_by_exp[(r.get("opening", True), r.get("freeze", False), r["experiment"])].append(r)
     for key in sorted(rows_by_exp):
-        freeze, exp = key
+        opening, freeze, exp = key
         rows = rows_by_exp[key]
-        print(f"== {'[새 줄 잠금] ' if freeze else ''}{NAMES.get(exp, exp)}")
+        tags = ("" if opening else "[오프닝 없음] ") + ("[새 줄 잠금] " if freeze else "")
+        print(f"== {tags}{NAMES.get(exp, exp)}")
         print(summarize(rows))
         if exp in (3, 4):
             print(by_matchup(rows))

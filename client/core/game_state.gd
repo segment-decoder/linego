@@ -33,8 +33,11 @@ var history: Array[Dictionary] = []
 ## 총 수 제한. 0이면 제한 없음 (시간 제한이 있는 대국은 시계가 끝을 정한다)
 var max_turns := MAX_TURNS
 
-## [실험 규칙] 새로 그은 줄 위에는 그 줄을 그은 사람의 상대가 바로 다음 차례에 돌을 놓을 수 없다.
-var freeze_new_line := false
+## 새 줄 잠금: 새로 그은 줄 위에는 그 줄을 그은 사람의 상대가 바로 다음 차례에 돌을 놓을 수 없다.
+## (정식 규칙. 실험에서 끌 수 있게 옵션으로 둔다)
+var freeze_new_line := true
+## 오프닝(4×4를 돌로 채울 때까지 돌 놓기만) 적용 여부. 정식 규칙이며 실험에서만 끈다.
+var opening_rule := true
 ## 지금 잠긴 줄: {"axis", "index", "blocked": 놓을 수 없는 색}. 없으면 빈 Dictionary.
 var frozen_line := {}
 
@@ -50,7 +53,7 @@ func is_over() -> bool:
 ## 오프닝: 처음 4×4 판을 돌로 모두 채울 때까지는 돌 놓기만 할 수 있다.
 ## (오프닝 동안은 줄을 그을 수 없으므로 판은 4×4 그대로이고, 16수를 두면 꽉 찬다)
 func in_opening() -> bool:
-	return board.width == START_SIZE and board.height == START_SIZE and not board.is_full()
+	return opening_rule and board.width == START_SIZE and board.height == START_SIZE and not board.is_full()
 
 
 func turn_count() -> int:
@@ -179,6 +182,7 @@ func to_dict() -> Dictionary:
 		"max_turns": max_turns,
 		"end_reason": end_reason,
 		"freeze_new_line": freeze_new_line,
+		"opening_rule": opening_rule,
 		"frozen_line": frozen_line.duplicate(),
 	}
 
@@ -191,7 +195,8 @@ static func from_dict(data: Dictionary) -> GameState:
 	game.draw = bool(data.get("draw", false))
 	game.max_turns = int(data.get("max_turns", MAX_TURNS))
 	game.end_reason = str(data.get("end_reason", ""))
-	game.freeze_new_line = bool(data.get("freeze_new_line", false))
+	game.freeze_new_line = bool(data.get("freeze_new_line", true))
+	game.opening_rule = bool(data.get("opening_rule", true))
 	var frozen: Dictionary = data.get("frozen_line", {})
 	if not frozen.is_empty():
 		game.frozen_line = {"axis": str(frozen.axis), "index": int(frozen.index), "blocked": int(frozen.blocked)}

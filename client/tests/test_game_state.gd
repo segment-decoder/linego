@@ -117,7 +117,8 @@ func test_only_the_mover_can_win() -> void:
 	game.apply(GameState.line_action(GameState.AXIS_COL, 1))
 	t.check(game.board.has_exact_five(Stone.WHITE))
 	t.check_eq(game.current_player, Stone.WHITE)
-	game.apply(GameState.place_action(1, 1))
+	# 흑이 그은 열 1은 백에게 잠겨 있으므로 다른 곳에 둔다.
+	game.apply(GameState.place_action(3, 1))
 	t.check_eq(game.winner, Stone.WHITE)
 
 
@@ -207,8 +208,10 @@ func test_freeze_cut_makes_line_a_defense() -> void:
 	t.check_eq(game.winner, Stone.EMPTY, "양 끝에 두어도 5목이 아니다")
 
 
-func test_freeze_off_by_default() -> void:
+func test_freeze_is_on_by_default_and_can_be_turned_off() -> void:
+	t.check(GameState.new().freeze_new_line, "정식 규칙")
 	var game := _after_opening()
+	game.freeze_new_line = false
 	game.apply(GameState.line_action(GameState.AXIS_COL, 2))
 	t.check_eq(game.validate(GameState.place_action(2, 0)), "")
 
@@ -232,3 +235,11 @@ func test_timeout_loses_and_unlimited_turns() -> void:
 	t.check_eq(game.end_reason, "timeout")
 	t.check(game.is_over())
 	t.check_eq(game.validate(GameState.place_action(1, 1)), "game_over")
+
+
+func test_opening_rule_can_be_turned_off() -> void:
+	var game := GameState.new()
+	game.opening_rule = false
+	t.check(not game.in_opening())
+	t.check(game.apply(GameState.line_action(GameState.AXIS_COL, 0)), "오프닝이 없으면 첫 수부터 줄 긋기 가능")
+	t.check(not GameState.from_dict(JSON.parse_string(JSON.stringify(game.to_dict()))).opening_rule)

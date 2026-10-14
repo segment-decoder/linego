@@ -18,6 +18,8 @@ const COLOR_WHITE := Color("f4f1ea")
 const COLOR_PREVIEW_LINE := Color(0.15, 0.45, 0.95, 0.9)
 const COLOR_FIVE_BLACK := Color(0.95, 0.25, 0.2, 0.9)
 const COLOR_FIVE_WHITE := Color(0.2, 0.55, 0.95, 0.9)
+## 이번 차례에 돌을 놓을 수 없는 잠긴 줄
+const COLOR_FROZEN := Color(0.15, 0.4, 1.0, 0.45)
 
 var game: GameState:
 	set(value):
@@ -77,6 +79,8 @@ func _draw() -> void:
 	var rect := board_rect()
 	draw_rect(rect.grow(CELL * 0.75), COLOR_BOARD)
 
+	_draw_frozen_line(rect)
+
 	var last: Dictionary = game.history.back() if not game.history.is_empty() else {}
 	for x in board.width:
 		var color := COLOR_LINE
@@ -105,6 +109,20 @@ func _draw() -> void:
 			draw_line(intersection_position(line[0].x, line[0].y), intersection_position(line[-1].x, line[-1].y), color, 10.0)
 
 	_draw_preview(rect)
+
+
+## 지금 차례인 사람에게 잠긴 줄을 띠로 표시한다.
+func _draw_frozen_line(rect: Rect2) -> void:
+	var frozen := game.frozen_line
+	if frozen.is_empty() or frozen.blocked != game.current_player or game.is_over():
+		return
+	var half := CELL * 0.32
+	if frozen.axis == GameState.AXIS_COL:
+		var x: float = frozen.index * CELL
+		draw_rect(Rect2(x - half, -LINE_OVERHANG, half * 2.0, rect.end.y + LINE_OVERHANG * 2.0), COLOR_FROZEN)
+	else:
+		var y: float = frozen.index * CELL
+		draw_rect(Rect2(-LINE_OVERHANG, y - half, rect.end.x + LINE_OVERHANG * 2.0, half * 2.0), COLOR_FROZEN)
 
 
 func _draw_stone(center: Vector2, stone: int, alpha: float) -> void:
