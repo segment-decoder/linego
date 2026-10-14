@@ -11,7 +11,7 @@ WebSocket 텍스트 메시지, 내용은 JSON 객체. 모든 메시지에 `"t"`(
 
 | t | 필드 | 설명 |
 |---|---|---|
-| `create_room` | `v`, `minutes` | 방을 만든다. `minutes`: 각자 시간 3/5/10 (그 외·생략 시 5). → `room_created` |
+| `create_room` | `v`, `minutes` | 방을 만든다. `minutes`: 각자 시간 5/10/20 (그 외·생략 시 10). → `room_created` |
 | `join_room` | `v`, `code` | 방 코드로 참가. 성공하면 두 사람 모두 `game_start` |
 | `action` | `action` | 수를 둔다. `action`은 GameState 행동 형식 (`{"type":"place","x","y"}` / `{"type":"line","axis","index"}`) |
 | `rematch` | | 게임이 끝난 뒤 다시 하기. 두 사람 모두 보내면 흑백을 바꿔 `game_start` |

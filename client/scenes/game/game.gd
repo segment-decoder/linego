@@ -92,7 +92,7 @@ func _ready() -> void:
 		start_game(_new_local_game())
 
 
-## 한 기기 대전 새 게임. 시간 제한을 켜 두었으면 각자 5분, 수 제한 없음.
+## 한 기기 대전 새 게임. 시간 제한을 켜 두었으면 각자 10분, 수 제한 없음.
 func _new_local_game() -> GameState:
 	var new_game := GameState.new()
 	clock = null

@@ -5,8 +5,8 @@ extends RefCounted
 ## 시각은 호출하는 쪽이 밀리초로 넘긴다 (서버/클라이언트/테스트가 각자의 시계를 쓸 수 있게).
 
 const Stone := BoardState.Stone
-const DEFAULT_MINUTES := 5
-const ALLOWED_MINUTES: Array[int] = [3, 5, 10]
+const DEFAULT_MINUTES := 10
+const ALLOWED_MINUTES: Array[int] = [5, 10, 20]
 
 var minutes: int
 ## 각 색의 남은 시간 (마지막으로 정산한 시점 기준)

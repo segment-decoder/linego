@@ -84,7 +84,7 @@ func _on_disconnected() -> void:
 func _on_message(msg: Dictionary) -> void:
 	match msg.get("t"):
 		"room_created":
-			status_label.text = "방 코드:  %s   (각자 %d분)\n\n친구가 이 코드로 참가하면 게임이 시작됩니다." % [msg.code, int(msg.get("minutes", 5))]
+			status_label.text = "방 코드:  %s   (각자 %d분)\n\n친구가 이 코드로 참가하면 게임이 시작됩니다." % [msg.code, int(msg.get("minutes", ChessClock.DEFAULT_MINUTES))]
 		"game_start":
 			get_tree().change_scene_to_file(GAME_SCENE)
 		"opponent_left":

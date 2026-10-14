@@ -46,15 +46,15 @@ func _start_server_room(minutes: Variant) -> ServerCore:
 
 
 func test_server_room_minutes() -> void:
-	var core := _start_server_room(3)
+	var core := _start_server_room(20)
 	var start: Dictionary = core.take_outbox()[0][1]
-	t.check_eq(start.clock.black_ms, 180000)
+	t.check_eq(start.clock.black_ms, 1200000)
 	t.check_eq(start.clock.running, Stone.BLACK)
 	t.check_eq(GameState.from_dict(start.state).max_turns, 0, "시계가 있으면 수 제한 없음")
 	core = _start_server_room(7)
-	t.check_eq(core.take_outbox()[0][1].clock.minutes, 5, "허용되지 않은 시간은 기본 5분")
+	t.check_eq(core.take_outbox()[0][1].clock.minutes, 10, "허용되지 않은 시간은 기본 10분")
 	core = _start_server_room(null)
-	t.check_eq(core.take_outbox()[0][1].clock.minutes, 5)
+	t.check_eq(core.take_outbox()[0][1].clock.minutes, 10, "생략하면 기본 10분")
 
 
 func test_server_move_switches_clock() -> void:
@@ -68,12 +68,12 @@ func test_server_move_switches_clock() -> void:
 
 
 func test_server_timeout_by_tick_and_late_move() -> void:
-	var core := _start_server_room(3)
+	var core := _start_server_room(5)
 	core.take_outbox()
-	core.fake_now_ms = 179999
+	core.fake_now_ms = 299999
 	core.tick()
 	t.check(core.take_outbox().is_empty(), "아직 시간이 남았다")
-	core.fake_now_ms = 180000
+	core.fake_now_ms = 300000
 	core.tick()
 	var out := core.take_outbox()
 	t.check_eq(out.size(), 2, "두 사람 모두에게 알림")
@@ -84,9 +84,9 @@ func test_server_timeout_by_tick_and_late_move() -> void:
 	t.check_eq(game.end_reason, "timeout")
 
 	# 시간이 지난 뒤에 도착한 수는 받지 않는다 (tick 전에 도착해도 마찬가지).
-	core = _start_server_room(3)
+	core = _start_server_room(5)
 	core.take_outbox()
-	core.fake_now_ms = 200000
+	core.fake_now_ms = 320000
 	core.handle_message(A, {"t": "action", "action": GameState.place_action(0, 0), "v": 3})
 	out = core.take_outbox()
 	t.check(out.any(func(item): return item[1].t == "timeout"))
